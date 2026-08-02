@@ -301,6 +301,11 @@ body.dark .seg{background:#0b100f;}
     </div>
     <div class="card">
       <input id="recFilter" placeholder="🔍 搜尋已盤商品" autocomplete="off">
+      <div class="seg" style="margin-top:8px">
+        <button id="sortU" class="on" onclick="setRecSort('urgent')">⏰ 效期最急</button>
+        <button id="sortN" onclick="setRecSort('name')">🔤 名稱</button>
+        <button id="sortB" onclick="setRecSort('batch')">📦 批次多</button>
+      </div>
     </div>
     <div class="card" id="recList"></div>
     <div class="card">
@@ -1186,26 +1191,52 @@ function renderTrash(){
       + `<button class="btn-sm btn-danger" style="margin-top:8px" onclick="emptyTrash()">永久清空回收桶</button>`
     : '<p class="muted center" style="padding:8px 0">回收桶是空的 ✨</p>');
 }
+let recSort = 'urgent';
+function setRecSort(s){
+  recSort = s;
+  document.getElementById('sortU').classList.toggle('on', s==='urgent');
+  document.getElementById('sortN').classList.toggle('on', s==='name');
+  document.getElementById('sortB').classList.toggle('on', s==='batch');
+  renderRecords();
+}
 function renderRecords(){
   renderDashboard(); renderUnscanned(); renderTrash();
   const f = document.getElementById('recFilter').value.trim().toLowerCase();
+  const terms = f.split(/\s+/).filter(Boolean);
   const box = document.getElementById('recList');
   const groups = {};
   for(const r of records){
     const k = r.pid+'|'+r.name;
     (groups[k] = groups[k]||[]).push(r);
   }
-  const keys = Object.keys(groups).filter(k=>!f || k.toLowerCase().includes(f));
-  if(!keys.length){ box.innerHTML='<p class="muted center" style="padding:16px 0">還沒有盤點記錄,去掃第一件商品吧!💪</p>'; return; }
+  let keys = Object.keys(groups).filter(k=>!terms.length || terms.every(t=>k.toLowerCase().includes(t)));
+  if(!keys.length){ box.innerHTML='<p class="muted center" style="padding:16px 0">找不到符合的商品</p>'; return; }
   const now = new Date();
+  const dayOf = exp => { const d = expDate(exp); return d ? Math.round((d-now)/86400000) : 99999; };
+  // 每個商品的批次:依效期由近到遠(先進先出順序)
+  for(const k of keys) groups[k].sort((a,b)=>dayOf(a.expiry)-dayOf(b.expiry));
+  // 群組排序
+  if(recSort==='urgent') keys.sort((a,b)=>dayOf(groups[a][0].expiry)-dayOf(groups[b][0].expiry));
+  else if(recSort==='name') keys.sort((a,b)=>groups[a][0].name.localeCompare(groups[b][0].name,'zh-Hant'));
+  else keys.sort((a,b)=>groups[b].length-groups[a].length);
+
   box.innerHTML = keys.map(k=>{
     const g = groups[k];
+    const totalQty = g.reduce((s,r)=>s+(Number(r.qty)||0),0);
+    const first = g[0];
+    const headCls = expClass(first.expiry, now);
+    const badge = g.length>1 ? `<span class="badge" style="background:var(--brand-dk)">${g.length} 批</span>` : '';
     return `<div class="rec-group">
-      <div class="rec-head"><span class="nm">${esc(g[0].name)}</span><span class="cnt">${g.length} 批</span></div>
-      ${g.map(r=>{
+      <div class="rec-head">
+        <span class="nm">${esc(first.name)}${badge}</span>
+        <span class="cnt">共 ${totalQty} ${esc(first.unit||'')}</span>
+      </div>
+      <div class="muted" style="font-size:12px;margin-top:2px">最近效期 <span class="exp ${headCls}">${esc(first.expiry)}</span>${g.length>1?'（先出這批）':''}</div>
+      ${g.map((r,i)=>{
         const cls = expClass(r.expiry, now);
+        const order = g.length>1 ? `<b style="color:var(--brand-dk)">${i+1}.</b> ` : '';
         return `<div class="rec-batch">
-          <span>批 ${esc(r.batch||'—')}｜<span class="exp ${cls}">${esc(r.expiry)}</span>｜${r.qty} ${esc(r.unit||'')}</span>
+          <span>${order}批 ${esc(r.batch||'—')}｜<span class="exp ${cls}">${esc(r.expiry)}</span>｜${r.qty} ${esc(r.unit||'')}${r.done?' ✅':''}</span>
           <button class="btn-sm btn-line" onclick="editRec('${r.rid}')">改</button>
           <button class="btn-sm btn-danger" onclick="delRec('${r.rid}')">刪</button>
         </div>`;

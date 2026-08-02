@@ -175,8 +175,14 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
     <div class="card">
       <h2>📷 掃描條碼</h2>
       <div id="scanBox"></div>
+      <div id="camCtrls" class="hidden" style="display:flex;gap:8px;margin-top:8px;align-items:center;justify-content:center;">
+        <button class="btn-sm btn-line" id="btnTorch" onclick="toggleTorch()">🔦 手電筒</button>
+        <button class="btn-sm btn-line" onclick="nudgeZoom(-1)">➖</button>
+        <span id="zoomLbl" class="muted" style="min-width:44px;text-align:center;">1.0x</span>
+        <button class="btn-sm btn-line" onclick="nudgeZoom(1)">➕ 放大</button>
+      </div>
       <button id="btnCam" class="btn-main" style="margin-top:10px" onclick="toggleCam()">開啟相機掃描</button>
-      <p class="hint" id="camHint">相機無法使用時,可直接在下方輸入條碼(也支援掃描槍)。</p>
+      <p class="hint" id="camHint">掃描小技巧:距離條碼 10~15 公分、按 ➕ 放大小條碼、暗處開 🔦。<br>相機無法使用時,可直接在下方輸入條碼(也支援掃描槍)。</p>
     </div>
 
     <div class="card">
@@ -402,28 +408,81 @@ function showView(v){
 
 /* ================= 相機掃描 ================= */
 async function toggleCam(){ scanning ? stopCam() : startCam(); }
+let camZoomCaps = null, camZoom = 1, torchOn = false;
 async function startCam(){
   try{
-    scanner = new Html5Qrcode('scanBox');
+    const cfg = { verbose: false,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true } }; // Android 原生條碼引擎,辨識力大增
+    if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
+      cfg.formatsToSupport = [ // 鎖定藥局常見格式,更快更準
+        Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.DATA_MATRIX,
+        Html5QrcodeSupportedFormats.QR_CODE ];
+    }
+    scanner = new Html5Qrcode('scanBox', cfg);
     await scanner.start(
       {facingMode:'environment'},
-      {fps:10, qrbox:{width:260,height:130}},
+      {
+        fps: 15,
+        qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}), // 更大的掃描框
+        videoConstraints: {facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}} // 高解析度
+      },
       code=>onScan(code),
       ()=>{}
     );
     scanning = true;
     document.getElementById('btnCam').textContent='⏸ 暫停相機';
+    initCamCtrls();
   }catch(e){
     document.getElementById('camHint').innerHTML =
       '⚠️ 這個環境無法開啟相機(常見於 App 內嵌頁面)。<br>請改用下方手動輸入,或把本檔案放到支援相機的網頁環境。';
     toast('相機無法啟動,請用手動輸入');
   }
 }
+async function initCamCtrls(){
+  camZoom = 1; torchOn = false; camZoomCaps = null;
+  document.getElementById('zoomLbl').textContent = '1.0x';
+  document.getElementById('btnTorch').textContent = '🔦 手電筒';
+  document.getElementById('camCtrls').classList.remove('hidden');
+  try{ await scanner.applyVideoConstraints({advanced:[{focusMode:'continuous'}]}); }catch(e){} // 持續自動對焦
+  try{
+    const caps = scanner.getRunningTrackCapabilities();
+    if(caps && caps.zoom){ camZoomCaps = caps.zoom;
+      await applyZoom(Math.min(2, camZoomCaps.max)); } // 預設2倍,小條碼更好掃
+  }catch(e){}
+}
+async function applyZoom(z){
+  if(!camZoomCaps) return;
+  z = Math.max(camZoomCaps.min||1, Math.min(camZoomCaps.max||1, z));
+  try{
+    await scanner.applyVideoConstraints({advanced:[{zoom: z}]});
+    camZoom = z;
+    document.getElementById('zoomLbl').textContent = z.toFixed(1)+'x';
+  }catch(e){}
+}
+function nudgeZoom(dir){
+  if(!scanning) return;
+  if(!camZoomCaps){ toast('這台裝置的相機不支援變焦'); return; }
+  const step = Math.max(camZoomCaps.step||0.5, 0.5);
+  applyZoom(camZoom + dir*step);
+}
+async function toggleTorch(){
+  if(!scanning) return;
+  try{
+    torchOn = !torchOn;
+    await scanner.applyVideoConstraints({advanced:[{torch: torchOn}]});
+    document.getElementById('btnTorch').textContent = torchOn ? '🔦 關燈' : '🔦 手電筒';
+  }catch(e){ torchOn = false; toast('這台裝置不支援手電筒'); }
+}
 async function stopCam(){
   if(scanner && scanning){ try{ await scanner.stop(); scanner.clear(); }catch(e){} }
   scanning = false;
   const b = document.getElementById('btnCam');
   if(b) b.textContent='開啟相機掃描';
+  const c = document.getElementById('camCtrls');
+  if(c) c.classList.add('hidden');
 }
 let lastScan = {code:'', t:0};
 function onScan(code){

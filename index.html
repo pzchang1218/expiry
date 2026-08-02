@@ -193,6 +193,26 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
       <div id="qResults"></div>
     </div>
 
+    <div class="card">
+      <button class="btn-ghost" onclick="toggleNewProd()">➕ 新增品項</button>
+      <div id="newProdForm" class="hidden">
+        <label>商品名稱 *</label>
+        <input id="npName" placeholder="例:新藥品名稱 500MG" autocomplete="off">
+        <div class="row2">
+          <div><label>條碼一</label><input id="npBc1" placeholder="可用掃描槍輸入" autocomplete="off"></div>
+          <div><label>條碼二</label><input id="npBc2" placeholder="(選填)" autocomplete="off"></div>
+        </div>
+        <div class="row2">
+          <div><label>單位</label><input id="npUnit" placeholder="盒/瓶/粒…" autocomplete="off"></div>
+          <div><label>編號(自動產生,可改)</label><input id="npId" autocomplete="off"></div>
+        </div>
+        <div class="row2" style="margin-top:14px">
+          <button class="btn-line" onclick="toggleNewProd()">取消</button>
+          <button class="btn-main" onclick="createProduct()">✓ 建立並登記效期</button>
+        </div>
+      </div>
+    </div>
+
     <div class="card hidden" id="formCard">
       <div class="prod-card">
         <div class="name" id="pName"></div>
@@ -779,11 +799,59 @@ async function saveRecord(){
 async function createManual(){
   const code = document.getElementById('notFoundCard').dataset.code;
   const name = document.getElementById('nfName').value.trim();
-  if(!name){ toast('請輸入商品名稱'); return; }
-  DB.push({id:'手動-'+code, bc1:code, bc2:'', name, unit:'', stock:''});
+  openNewProd(code, name); // 導入完整建檔表單
+}
+/* ================= 新增品項 ================= */
+function nextProdId(){
+  let mx = 0;
+  for(const p of DB){ const n = parseInt(p.id, 10); if(!isNaN(n) && n > mx) mx = n; }
+  return String(mx + 1).padStart(6, '0');
+}
+function toggleNewProd(){
+  const f = document.getElementById('newProdForm');
+  const show = f.classList.contains('hidden');
+  f.classList.toggle('hidden');
+  if(show){
+    document.getElementById('npName').value='';
+    document.getElementById('npBc1').value='';
+    document.getElementById('npBc2').value='';
+    document.getElementById('npUnit').value='';
+    document.getElementById('npId').value = nextProdId();
+    document.getElementById('npName').focus();
+  }
+}
+function openNewProd(bc, name){
+  document.getElementById('notFoundCard').classList.add('hidden');
+  const f = document.getElementById('newProdForm');
+  f.classList.remove('hidden');
+  document.getElementById('npName').value = name || '';
+  document.getElementById('npBc1').value = bc || '';
+  document.getElementById('npBc2').value = '';
+  document.getElementById('npUnit').value = '';
+  document.getElementById('npId').value = nextProdId();
+  f.scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById(name ? 'npUnit' : 'npName').focus();
+}
+async function createProduct(){
+  const name = document.getElementById('npName').value.trim();
+  if(!name){ toast('商品名稱是必填的唷'); return; }
+  const bc1 = document.getElementById('npBc1').value.trim();
+  const bc2 = document.getElementById('npBc2').value.trim();
+  let id = document.getElementById('npId').value.trim() || nextProdId();
+  // 防呆:編號或條碼撞號檢查
+  if(DB.some(p => p.id === id)){ toast('編號 '+id+' 已存在,請換一個'); return; }
+  for(const bc of [bc1, bc2]){
+    if(!bc) continue;
+    const dup = DB.find(p => p.bc1===bc || p.bc2===bc);
+    if(dup && !confirm('條碼 '+bc+' 已屬於「'+dup.name+'」,確定仍要建立新品項?')) return;
+  }
+  DB.push({id, bc1, bc2, name, unit: document.getElementById('npUnit').value.trim(), stock: ''});
   loadDB(DB);
   await sSet('pos-products', JSON.stringify(DB));
-  openForm(DB.length-1);
+  document.getElementById('newProdForm').classList.add('hidden');
+  refreshAll();
+  toast('✓ 已新增品項:'+name.slice(0,12));
+  openForm(DB.length - 1); // 直接進入效期登記
 }
 
 /* ================= 記錄頁 ================= */

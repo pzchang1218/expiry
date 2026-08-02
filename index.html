@@ -172,6 +172,7 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 
   <!-- ============ 掃描登記 ============ -->
   <section id="viewScan" class="hidden">
+    <div id="envWarn" class="hidden" style="background:#fdecea;border:2px solid #b3261e;border-radius:14px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.7;color:#7a1a14;"></div>
     <div class="card">
       <h2>📷 掃描條碼</h2>
       <div id="scanBox"></div>
@@ -183,6 +184,7 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
         <button class="btn-sm btn-danger" onclick="reportFrontCam()">🙅 這是自拍鏡</button>
       </div>
       <select id="camSel" class="hidden" style="margin-top:8px;" onchange="switchCam(this.value)"></select>
+      <p id="camDiag" class="muted" style="margin:6px 0 0;font-size:12px;"></p>
       <button id="btnCam" class="btn-main" style="margin-top:10px" onclick="toggleCam()">開啟相機掃描</button>
       <input type="file" id="photoScan" accept="image/*" capture="environment" class="hidden">
       <button class="btn-ghost" style="margin-top:8px" onclick="document.getElementById('photoScan').click()">📸 拍照掃描(原生相機,保證後鏡頭)</button>
@@ -417,6 +419,7 @@ function enterApp(){
   document.getElementById('tabs').style.display='flex';
   showView('scan');
   refreshAll();
+  checkEnv(); // 檢查瀏覽器環境,揪出三星瀏覽器
   if(!storageOK) toast('⚠️ 此環境無法永久儲存,離開前請先匯出 Excel');
 }
 
@@ -435,6 +438,48 @@ function showView(v){
 /* ================= 相機掃描 ================= */
 async function toggleCam(){ scanning ? stopCam() : startCam(); }
 let camZoomCaps = null, camZoom = 1, torchOn = false;
+function detectBrowser(){
+  const ua = navigator.userAgent || '';
+  if(/SamsungBrowser/i.test(ua)) return 'samsung';
+  if(/Line\//i.test(ua)) return 'line';
+  if(/FBAV|FB_IAB|Instagram/i.test(ua)) return 'inapp';
+  if(/Edg\//i.test(ua)) return 'edge';
+  if(/Chrome\//i.test(ua)) return 'chrome';
+  return 'other';
+}
+function checkEnv(){
+  const b = detectBrowser();
+  const w = document.getElementById('envWarn');
+  if(b === 'samsung'){
+    w.innerHTML = '🚨 <b>找到相機故障的兇手了:您正在用「三星瀏覽器」!</b><br>'
+      + '三星瀏覽器有已知 bug:不論程式怎麼指定後鏡頭,它都硬給前鏡頭。<br>'
+      + '<b>解法(3 分鐘)</b>:<br>'
+      + '① 長按桌面的「效期盤點」圖示 → 移除<br>'
+      + '② 開啟 <b>Chrome</b> App(彩色圓球圖示),在網址列輸入本站網址<br>'
+      + '③ Chrome 右上「⋮」→「加到主畫面」重新安裝<br>'
+      + '④ 從新圖示開啟 → 相機就會是後鏡頭了!';
+    w.classList.remove('hidden');
+  }else if(b === 'line' || b === 'inapp'){
+    w.innerHTML = '⚠️ 您正在 LINE/社群 App 的內建視窗中開啟,相機功能會受限。<br>'
+      + '請點右下角選單 →「用其他瀏覽器開啟」→ 選 <b>Chrome</b>,再加到主畫面。';
+    w.classList.remove('hidden');
+  }else{
+    w.classList.add('hidden');
+  }
+}
+function showCamDiag(){
+  try{
+    const bMap = {samsung:'⚠️三星瀏覽器', line:'⚠️LINE內建', inapp:'⚠️App內建', edge:'Edge', chrome:'Chrome ✓', other:'其他'};
+    let camInfo = '未知';
+    const st = scanner.getRunningTrackSettings();
+    if(st){
+      const c = camList.find(x => x.id === st.deviceId);
+      camInfo = (c && c.label ? c.label : '') + (st.facingMode ? '('+st.facingMode+')' : '');
+    }
+    document.getElementById('camDiag').textContent =
+      '🔬 診斷:瀏覽器 ' + (bMap[detectBrowser()]||'?') + '|使用中鏡頭:' + (camInfo||'?');
+  }catch(e){}
+}
 function buildScanEngineCfg(){
   const cfg = { verbose: false,
     experimentalFeatures: { useBarCodeDetectorIfSupported: true } }; // Android 原生條碼引擎
@@ -539,6 +584,7 @@ async function startCam(){
   document.getElementById('btnCam').textContent='⏸ 暫停相機';
   initCamCtrls();
   renderCamList();
+  showCamDiag();
 }
 async function initCamCtrls(){
   camZoom = 1; torchOn = false; camZoomCaps = null;

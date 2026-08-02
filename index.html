@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>效期盤點小幫手</title>
+<meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0b6b55">
 <link rel="manifest" href="manifest.json">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -131,6 +132,22 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 </head>
 <body>
 
+<!-- ============ PIN 門鎖 ============ -->
+<div id="pinLock" style="position:fixed;inset:0;z-index:999;background:linear-gradient(160deg,#0b6b55,#0f8a6d);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#fff;border-radius:18px;padding:28px 22px;max-width:340px;width:100%;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.3);">
+    <div style="font-size:40px;">🔒</div>
+    <h2 style="margin:8px 0 4px;font-size:18px;color:#173b34;">效期盤點小幫手</h2>
+    <p style="margin:0 0 16px;font-size:13px;color:#4a6660;">請輸入 PIN 碼解鎖</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="off"
+      style="width:100%;padding:14px;font-size:26px;text-align:center;letter-spacing:10px;border:2px solid #dbe7e2;border-radius:12px;">
+    <p id="pinErr" style="min-height:18px;margin:8px 0 4px;font-size:13px;color:#b3261e;"></p>
+    <label style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;color:#4a6660;margin-bottom:12px;cursor:pointer;">
+      <input type="checkbox" id="pinRemember" checked style="width:auto;">記住這台裝置 30 天
+    </label>
+    <button onclick="tryUnlock()" style="width:100%;padding:14px;background:#0f8a6d;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;">解鎖</button>
+  </div>
+</div>
+
 <header>
   <h1>💊 效期盤點小幫手</h1>
   <div class="progress-pill">
@@ -247,6 +264,36 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 <input type="file" id="dbFile2" accept=".xlsx,.xls" class="hidden">
 
 <script>
+/* ================= PIN 門鎖 ================= */
+const PIN_HASH = 3064869360; // djb2 雜湊,原始碼中不出現明碼
+function pinHash(s){
+  s = 'posPIN:' + s;
+  let h = 5381;
+  for(let i=0;i<s.length;i++){ h = (Math.imul(h,33) + s.charCodeAt(i)) >>> 0; }
+  return h;
+}
+(function initLock(){
+  try{
+    const until = +localStorage.getItem('pos-pin-until') || 0;
+    if(Date.now() < until){ document.getElementById('pinLock').style.display='none'; return; }
+  }catch(e){}
+  const inp = document.getElementById('pinInput');
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
+  setTimeout(()=>inp.focus(), 300);
+})();
+function tryUnlock(){
+  const inp = document.getElementById('pinInput');
+  if(pinHash(inp.value.trim()) === PIN_HASH){
+    if(document.getElementById('pinRemember').checked){
+      try{ localStorage.setItem('pos-pin-until', String(Date.now() + 30*86400000)); }catch(e){}
+    }
+    document.getElementById('pinLock').style.display='none';
+  }else{
+    document.getElementById('pinErr').textContent = 'PIN 碼不正確,請再試一次';
+    inp.value=''; inp.focus();
+  }
+}
+
 /* ================= 資料層 ================= */
 let DB = [];            // 商品主檔 [{id,bc1,bc2,name,unit,stock}]
 let bcIndex = new Map();// 條碼 -> [索引]

@@ -181,6 +181,7 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
         <span id="zoomLbl" class="muted" style="min-width:44px;text-align:center;">1.0x</span>
         <button class="btn-sm btn-line" onclick="nudgeZoom(1)">➕ 放大</button>
       </div>
+      <select id="camSel" class="hidden" style="margin-top:8px;" onchange="switchCam(this.value)"></select>
       <button id="btnCam" class="btn-main" style="margin-top:10px" onclick="toggleCam()">開啟相機掃描</button>
       <p class="hint" id="camHint">掃描小技巧:距離條碼 10~15 公分、按 ➕ 放大小條碼、暗處開 🔦。<br>相機無法使用時,可直接在下方輸入條碼(也支援掃描槍)。</p>
     </div>
@@ -422,19 +423,25 @@ async function startCam(){
         Html5QrcodeSupportedFormats.QR_CODE ];
     }
     scanner = new Html5Qrcode('scanBox', cfg);
-    await scanner.start(
-      {facingMode:'environment'},
-      {
-        fps: 15,
-        qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}), // 更大的掃描框
-        videoConstraints: {facingMode:'environment', width:{ideal:1920}, height:{ideal:1080}} // 高解析度
-      },
-      code=>onScan(code),
-      ()=>{}
-    );
+    let camConfig = {facingMode:'environment'};
+    try{ const saved = localStorage.getItem('pos-cam-id'); if(saved) camConfig = {deviceId:{exact:saved}}; }catch(e){}
+    const scanCfg = {
+      fps: 15,
+      qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}), // 更大的掃描框
+      videoConstraints: {width:{ideal:1920}, height:{ideal:1080}} // 高解析度
+    };
+    try{
+      await scanner.start(camConfig, scanCfg, code=>onScan(code), ()=>{});
+    }catch(err){
+      if(camConfig.deviceId){ // 記住的鏡頭失效 → 回退預設後鏡頭
+        try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+        await scanner.start({facingMode:'environment'}, scanCfg, code=>onScan(code), ()=>{});
+      }else throw err;
+    }
     scanning = true;
     document.getElementById('btnCam').textContent='⏸ 暫停相機';
     initCamCtrls();
+    loadCamList();
   }catch(e){
     document.getElementById('camHint').innerHTML =
       '⚠️ 這個環境無法開啟相機(常見於 App 內嵌頁面)。<br>請改用下方手動輸入,或把本檔案放到支援相機的網頁環境。';
@@ -475,6 +482,26 @@ async function toggleTorch(){
     await scanner.applyVideoConstraints({advanced:[{torch: torchOn}]});
     document.getElementById('btnTorch').textContent = torchOn ? '🔦 關燈' : '🔦 手電筒';
   }catch(e){ torchOn = false; toast('這台裝置不支援手電筒'); }
+}
+let camList = [];
+async function loadCamList(){
+  try{
+    camList = await Html5Qrcode.getCameras();
+    if(camList.length > 1){
+      let saved = ''; try{ saved = localStorage.getItem('pos-cam-id')||''; }catch(e){}
+      const sel = document.getElementById('camSel');
+      sel.innerHTML = '<option value="" disabled '+(saved?'':'selected')+'>📷 掃不到/對不了焦?換顆鏡頭試試</option>' +
+        camList.map((c,i)=>`<option value="${c.id}" ${c.id===saved?'selected':''}>鏡頭 ${i+1}:${esc(c.label||('camera '+(i+1)))}</option>`).join('');
+      sel.classList.remove('hidden');
+    }
+  }catch(e){}
+}
+async function switchCam(id){
+  if(!id) return;
+  try{ localStorage.setItem('pos-cam-id', id); }catch(e){}
+  await stopCam();
+  startCam();
+  toast('已切換鏡頭,對條碼試掃看看');
 }
 async function stopCam(){
   if(scanner && scanning){ try{ await scanner.stop(); scanner.clear(); }catch(e){} }

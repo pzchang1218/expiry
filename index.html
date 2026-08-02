@@ -423,25 +423,30 @@ async function startCam(){
         Html5QrcodeSupportedFormats.QR_CODE ];
     }
     scanner = new Html5Qrcode('scanBox', cfg);
-    let camConfig = {facingMode:'environment'};
-    try{ const saved = localStorage.getItem('pos-cam-id'); if(saved) camConfig = {deviceId:{exact:saved}}; }catch(e){}
+    let camConfig = null;
+    try{ const saved = localStorage.getItem('pos-cam-id'); if(saved && !skipSaved) camConfig = {deviceId:{exact:saved}}; }catch(e){}
+    skipSaved = false;
     const scanCfg = {
       fps: 15,
       qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}), // 更大的掃描框
       videoConstraints: {width:{ideal:1920}, height:{ideal:1080}} // 高解析度
     };
-    try{
-      await scanner.start(camConfig, scanCfg, code=>onScan(code), ()=>{});
-    }catch(err){
-      if(camConfig.deviceId){ // 記住的鏡頭失效 → 回退預設後鏡頭
-        try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
-        await scanner.start({facingMode:'environment'}, scanCfg, code=>onScan(code), ()=>{});
-      }else throw err;
+    // 依序嘗試:記住的鏡頭 → 強制後鏡頭 → 一般後鏡頭
+    const tries = [];
+    if(camConfig) tries.push(camConfig);
+    tries.push({facingMode:{exact:'environment'}});
+    tries.push({facingMode:'environment'});
+    let started = false, lastErr = null;
+    for(const t of tries){
+      try{ await scanner.start(t, scanCfg, code=>onScan(code), ()=>{}); started = true; break; }
+      catch(err){ lastErr = err; if(t.deviceId){ try{ localStorage.removeItem('pos-cam-id'); }catch(e){} } }
     }
+    if(!started) throw lastErr;
     scanning = true;
     document.getElementById('btnCam').textContent='⏸ 暫停相機';
     initCamCtrls();
     loadCamList();
+    verifyBackCamera(); // 驗明正身:抓到自拍鏡就強制換人
   }catch(e){
     document.getElementById('camHint').innerHTML =
       '⚠️ 這個環境無法開啟相機(常見於 App 內嵌頁面)。<br>請改用下方手動輸入,或把本檔案放到支援相機的網頁環境。';
@@ -484,19 +489,31 @@ async function toggleTorch(){
   }catch(e){ torchOn = false; toast('這台裝置不支援手電筒'); }
 }
 let camList = [];
+let skipSaved = false, camRetry = 0;
+async function verifyBackCamera(){
+  // 用「實際運作中的鏡頭方向」判斷,不信名牌
+  try{
+    const st = scanner.getRunningTrackSettings();
+    if(st && st.facingMode === 'user'){ // 抓到自拍鏡!
+      try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+      if(camRetry < 2){
+        camRetry++;
+        toast('偵測到自拍鏡頭,強制切回後鏡頭…');
+        skipSaved = true;
+        await stopCam();
+        startCam();
+        return;
+      }
+    }
+    camRetry = 0;
+  }catch(e){}
+}
 async function loadCamList(){
   try{
     camList = await Html5Qrcode.getCameras();
     if(camList.length > 1){
       let saved = ''; try{ saved = localStorage.getItem('pos-cam-id')||''; }catch(e){}
       const isFront = c => /front|user|前/i.test(c.label||'');
-      // 若之前誤選/誤存了前鏡頭 → 自動清除並改回後鏡頭重啟
-      const savedCam = camList.find(c => c.id === saved);
-      if(savedCam && isFront(savedCam)){
-        try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
-        toast('偵測到前鏡頭,已自動切回後鏡頭');
-        await stopCam(); startCam(); return;
-      }
       const backs = camList.filter(c => !isFront(c));
       const fronts = camList.filter(isFront);
       const sel = document.getElementById('camSel');
@@ -509,6 +526,7 @@ async function loadCamList(){
 }
 async function switchCam(id){
   if(!id) return;
+  camRetry = 0; // 重新計數,選錯會自動彈回後鏡頭
   try{ localStorage.setItem('pos-cam-id', id); }catch(e){}
   await stopCam();
   startCam();

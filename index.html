@@ -184,6 +184,9 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
       </div>
       <select id="camSel" class="hidden" style="margin-top:8px;" onchange="switchCam(this.value)"></select>
       <button id="btnCam" class="btn-main" style="margin-top:10px" onclick="toggleCam()">開啟相機掃描</button>
+      <input type="file" id="photoScan" accept="image/*" capture="environment" class="hidden">
+      <button class="btn-ghost" style="margin-top:8px" onclick="document.getElementById('photoScan').click()">📸 拍照掃描(原生相機,保證後鏡頭)</button>
+      <div id="photoBox" class="hidden"></div>
       <p class="hint" id="camHint">掃描小技巧:距離條碼 10~15 公分、按 ➕ 放大小條碼、暗處開 🔦。<br>相機無法使用時,可直接在下方輸入條碼(也支援掃描槍)。</p>
     </div>
 
@@ -431,7 +434,7 @@ function showView(v){
 /* ================= 相機掃描 ================= */
 async function toggleCam(){ scanning ? stopCam() : startCam(); }
 let camZoomCaps = null, camZoom = 1, torchOn = false;
-async function startCam(){
+function buildScanEngineCfg(){
   const cfg = { verbose: false,
     experimentalFeatures: { useBarCodeDetectorIfSupported: true } }; // Android 原生條碼引擎
   if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
@@ -442,6 +445,28 @@ async function startCam(){
       Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.DATA_MATRIX,
       Html5QrcodeSupportedFormats.QR_CODE ];
   }
+  return cfg;
+}
+// 📸 拍照掃描:用原生相機拍條碼照片後自動辨識(繞過瀏覽器鏡頭選擇)
+document.getElementById('photoScan').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  e.target.value = '';
+  if(!file) return;
+  toast('辨識中…');
+  let tmp = null;
+  try{
+    tmp = new Html5Qrcode('photoBox', buildScanEngineCfg());
+    const code = await tmp.scanFile(file, false);
+    beep();
+    lookup(String(code));
+  }catch(err){
+    toast('照片裡讀不到條碼 — 請讓條碼占滿畫面、對焦清楚再拍一次');
+  }finally{
+    if(tmp){ try{ tmp.clear(); }catch(e2){} }
+  }
+});
+async function startCam(){
+  const cfg = buildScanEngineCfg();
   const scanCfg = {
     fps: 15,
     qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}),
@@ -472,6 +497,9 @@ async function startCam(){
   const anyOk = camList.find(c=>!banned(c.id));
   if(anyOk) queue.push({t: anyOk.id, verify:false}); // 保底:至少讓相機開起來
   let started = false, lastErr = null;
+  // 跳過計數:您每按一次🙅,就多跳過一個「能開但是自拍」的候選(鏡頭編號浮動也追得到)
+  let skipN = 0; try{ skipN = parseInt(localStorage.getItem('pos-cam-skip')||'0',10)||0; }catch(e){}
+  let passed = 0;
   for(const cand of queue){
     try{
       await freshScanner();
@@ -484,8 +512,16 @@ async function startCam(){
         if(cand.t.deviceId){ try{ if(localStorage.getItem('pos-cam-id')===cand.t.deviceId.exact) localStorage.removeItem('pos-cam-id'); }catch(e){} }
         continue;
       }
+      if(passed < skipN){ passed++; continue; } // 依您的🙅指示跳過
       started = true; break;
     }catch(err){ lastErr = err; }
+  }
+  if(!started && skipN > 0){
+    // 全部候選都被跳過了 → 歸零重來,並提示
+    try{ localStorage.setItem('pos-cam-skip','0'); }catch(e){}
+    toast('所有鏡頭都試過一輪了,已重新開始;建議改用 📸 拍照掃描');
+    startCam();
+    return;
   }
   if(!started){
     let msg = '⚠️ 相機無法啟動。';
@@ -543,12 +579,16 @@ let camBlacklist = [];
 try{ camBlacklist = JSON.parse(localStorage.getItem('pos-cam-blacklist')||'[]'); }catch(e){ camBlacklist = []; }
 function saveBlacklist(){ try{ localStorage.setItem('pos-cam-blacklist', JSON.stringify(camBlacklist)); }catch(e){} }
 async function reportFrontCam(){
-  // 使用者親自認證:目前這顆是自拍鏡 → 永久拉黑,自動換下一顆
+  // 使用者親自認證:目前這顆是自拍鏡 → 拉黑 + 跳過計數+1,換下一顆
   let runId = '';
   try{ const st = scanner.getRunningTrackSettings(); runId = (st && st.deviceId) || ''; }catch(e){}
   if(runId && !camBlacklist.includes(runId)){ camBlacklist.push(runId); saveBlacklist(); }
+  try{
+    const n = (parseInt(localStorage.getItem('pos-cam-skip')||'0',10)||0) + 1;
+    localStorage.setItem('pos-cam-skip', String(n));
+  }catch(e){}
   try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
-  toast('已拉黑這顆自拍鏡,換下一顆…');
+  toast('收到!換下一顆鏡頭…');
   await stopCam();
   startCam();
 }
@@ -590,7 +630,7 @@ async function switchCam(id){
   if(!id) return;
   if(id === '__reset'){
     camBlacklist = []; saveBlacklist();
-    try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+    try{ localStorage.removeItem('pos-cam-id'); localStorage.setItem('pos-cam-skip','0'); }catch(e){}
     toast('已重設鏡頭記錄');
     await stopCam(); startCam();
     return;

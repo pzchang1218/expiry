@@ -540,15 +540,15 @@ async function startCam(){
   const isFrontCam = c => /front|user|前/i.test(c.label||'');
   const isBackCam  = c => /back|environment|後/i.test(c.label||'');
   const banned = id => camBlacklist.includes(id);
-  // 候選佇列:強制後置(OS層級最可靠)→ 記住的 → Fold5主鏡頭 → 其他後鏡頭 → 一般後置 → 保底
-  const mainCam = camList.find(c => /camera2\s*0\b/i.test(c.label||'') && !isFrontCam(c) && !banned(c.id));
+  // 候選佇列:記住的 → ⭐預設主鏡頭(camera 0 / camera2 0, facing back)→ 其他後鏡頭 → 強制後置 → 一般後置 → 保底
+  const mainCam = camList.find(c => /camera2?\s*0\b/i.test(c.label||'') && !isFrontCam(c) && !banned(c.id));
   const otherBacks = camList.filter(c => isBackCam(c) && !isFrontCam(c) && c !== mainCam && !banned(c.id));
   const queue = [];
+  if(mainCam) queue.push({t:{deviceId:{exact:mainCam.id}}, verify:true}); // ⭐ 您欽定的預設鏡頭
   queue.push({t:{facingMode:{exact:'environment'}}, verify:true});
   try{ const saved = localStorage.getItem('pos-cam-id');
        const sc = camList.find(c=>c.id===saved);
        if(sc && !isFrontCam(sc) && !banned(saved)) queue.unshift({t:{deviceId:{exact:saved}}, verify:true}); }catch(e){}
-  if(mainCam) queue.push({t:{deviceId:{exact:mainCam.id}}, verify:true});
   otherBacks.forEach(c => queue.push({t:{deviceId:{exact:c.id}}, verify:true}));
   queue.push({t:{facingMode:'environment'}, verify:true});
   const anyOk = camList.find(c=>!banned(c.id));
@@ -679,8 +679,9 @@ function renderCamList(){
       sel.innerHTML = '<option value="" disabled '+((saved||activeId)?'':'selected')+'>📷 掃不到/對不了焦?換顆後鏡頭試試</option>' +
         backs.map((c,i)=>{
           if(camBlacklist.includes(c.id)) return `<option disabled>🚫 後鏡頭 ${i+1}(已認證是自拍鏡)</option>`;
+          const star = /camera2?\s*0\b/i.test(c.label||'') ? '⭐ ' : '';
           const mark = c.id===activeId ? '✅ 使用中|' : '';
-          return `<option value="${c.id}" ${c.id===(saved||activeId)?'selected':''}>${mark}後鏡頭 ${i+1}:${esc(c.label||('camera '+(i+1)))}</option>`;
+          return `<option value="${c.id}" ${c.id===(saved||activeId)?'selected':''}>${mark}${star}後鏡頭 ${i+1}:${esc(c.label||('camera '+(i+1)))}</option>`;
         }).join('') +
         fronts.map(()=>`<option disabled>前鏡頭(自拍用,不能選)</option>`).join('') +
         (camBlacklist.length ? '<option value="__reset">🔄 重設鏡頭記錄(解除拉黑重來)</option>' : '');

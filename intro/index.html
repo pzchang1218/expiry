@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>效期小幫手 — 手機掃碼,效期不再漏管</title>
+<meta name="description" content="用手機掃條碼登記商品效期,自動提醒即期與過期商品。不用註冊、不用裝App、資料存自己手機。">
+<meta property="og:title" content="效期小幫手 — 手機掃碼,效期不再漏管">
+<meta property="og:description" content="掃條碼登記效期,每月自動提醒。藥局、診所、餐飲、美容業都適用。">
+<style>
+:root{
+  --ink:#122b26; --ink2:#4d6862; --faint:#8ba099;
+  --bg:#f4f8f6; --card:#fff; --line:#dde8e4;
+  --g1:#0b6b55; --g2:#0f8a6d; --g3:#e3f3ee;
+  --red:#b3261e; --org:#e65100; --yel:#c78a00; --grn:#0f8a6d;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;scroll-behavior:smooth;}
+body{
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  background:var(--bg); color:var(--ink); line-height:1.75; font-size:16px;
+}
+.wrap{max-width:760px; margin:0 auto; padding:0 18px;}
+section{padding:44px 0;}
+h2{font-size:22px; margin:0 0 6px; letter-spacing:1px;}
+.lead{color:var(--ink2); font-size:15px; margin:0 0 22px;}
+
+/* Hero */
+.hero{
+  background:linear-gradient(155deg,#0b6b55 0%,#0f8a6d 55%,#1aa585 100%);
+  color:#fff; padding:52px 0 46px; text-align:center; position:relative; overflow:hidden;
+}
+.hero::after{content:""; position:absolute; right:-70px; top:-70px; width:260px; height:260px;
+  border:1px solid rgba(255,255,255,.18); border-radius:50%;}
+.hero img{width:96px; height:96px; border-radius:24px; box-shadow:0 8px 26px rgba(0,0,0,.25);}
+.hero h1{font-size:30px; margin:16px 0 8px; letter-spacing:2px; font-weight:800; position:relative;}
+.hero p{margin:0 auto; max-width:520px; font-size:16px; color:#d5efe6; position:relative;}
+.cta{
+  display:inline-block; margin-top:24px; background:#fff; color:var(--g1);
+  padding:15px 32px; border-radius:99px; font-weight:800; font-size:17px;
+  text-decoration:none; box-shadow:0 6px 20px rgba(0,0,0,.2); position:relative;
+}
+.cta.ghost{background:rgba(255,255,255,.16); color:#fff; box-shadow:none; border:1.5px solid rgba(255,255,255,.5);}
+.hero .note{font-size:13px; color:#a8d8c9; margin-top:14px;}
+
+/* 痛點 */
+.pain{display:grid; gap:12px;}
+.pain div{background:var(--card); border:1px solid var(--line); border-left:5px solid var(--red);
+  border-radius:12px; padding:14px 16px; font-size:15px;}
+
+/* 顏色卡 */
+.tiers{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:8px;}
+.tier{border-radius:14px; padding:16px 8px; text-align:center; color:#fff;}
+.tier b{display:block; font-size:19px;}
+.tier span{font-size:12px; opacity:.92;}
+
+/* 功能 */
+.feat{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.f{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px;}
+.f .i{font-size:26px; display:block; margin-bottom:6px;}
+.f b{display:block; font-size:15.5px; margin-bottom:3px;}
+.f span{font-size:13.5px; color:var(--ink2); line-height:1.7;}
+
+/* 步驟 */
+.steps{counter-reset:s; display:grid; gap:12px;}
+.step{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 16px 16px 60px; position:relative;}
+.step::before{
+  counter-increment:s; content:counter(s);
+  position:absolute; left:16px; top:16px; width:30px; height:30px; border-radius:50%;
+  background:var(--g2); color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:15px;
+}
+.step b{display:block; font-size:15.5px;}
+.step span{font-size:13.5px; color:var(--ink2);}
+
+/* 適用 */
+.tags{display:flex; flex-wrap:wrap; gap:8px;}
+.tag{background:var(--g3); color:var(--g1); border-radius:99px; padding:7px 15px; font-size:14px; font-weight:700;}
+
+/* FAQ */
+details{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:13px 16px; margin-bottom:9px;}
+details summary{cursor:pointer; font-weight:700; font-size:15px; list-style:none;}
+details summary::-webkit-details-marker{display:none;}
+details summary::before{content:"＋ "; color:var(--g2); font-weight:800;}
+details[open] summary::before{content:"− ";}
+details p{margin:9px 0 0; font-size:14px; color:var(--ink2);}
+
+/* 結尾 */
+.end{background:linear-gradient(155deg,#0b6b55,#0f8a6d); color:#fff; text-align:center; padding:46px 0;}
+.end h2{color:#fff;}
+.end p{color:#cdeade; margin:0 auto 6px; max-width:480px;}
+footer{text-align:center; padding:26px 18px 34px; font-size:12.5px; color:var(--faint); line-height:2;}
+@media(max-width:520px){
+  .feat{grid-template-columns:1fr;}
+  .tiers{grid-template-columns:repeat(2,1fr);}
+  .hero h1{font-size:25px;}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <img src="icon-192.png" alt="效期小幫手" onerror="this.style.display='none'">
+    <h1>效期小幫手</h1>
+    <p>手機掃條碼,登記商品效期。<br>每個月自動告訴你:哪些快到期、哪些已過期、哪些該叫貨了。</p>
+    <a class="cta" href="./trial/">👉 立即免費試用</a>
+    <p class="note">不用註冊 · 不用下載 App · 資料只存在你自己的手機</p>
+  </div>
+</div>
+
+<section class="wrap">
+  <h2>這些狀況,是不是很熟悉?</h2>
+  <p class="lead">效期管理最麻煩的,從來不是「記不住」,而是「忘了要記」。</p>
+  <div class="pain">
+    <div>整理貨架時才發現，好幾盒早就過期了 😱</div>
+    <div>Excel 表格開了又開,每次更新都要滑很久</div>
+    <div>同一個商品好幾批,哪一批該先賣完全靠記憶</div>
+    <div>知道有東西快到期,但不知道「到底有幾件、在哪一櫃」</div>
+    <div>月底想算「這個月因為過期損失多少」,根本算不出來</div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>四種顏色,一眼看懂該處理什麼</h2>
+  <p class="lead">打開就看到分類統計,點顏色只看那一類,不用一直往下滑。</p>
+  <div class="tiers">
+    <div class="tier" style="background:#b3261e"><b>已過期</b><span>立刻下架</span></div>
+    <div class="tier" style="background:#e65100"><b>1 個月</b><span>優先出清</span></div>
+    <div class="tier" style="background:#c78a00"><b>3 個月</b><span>安排促銷</span></div>
+    <div class="tier" style="background:#0f8a6d"><b>6 個月</b><span>提前掌握</span></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>完整功能</h2>
+  <p class="lead">從掃碼登記到月報產出,一支手機全包。</p>
+  <div class="feat">
+    <div class="f"><span class="i">📷</span><b>掃碼登記</b><span>掃條碼帶出商品,填批號、效期、數量就完成。原廠藥盒的二維碼還能自動帶入批號與效期。</span></div>
+    <div class="f"><span class="i">📦</span><b>同商品多批次</b><span>不同效期各自追蹤,自動依先進先出排序,誰該先賣一目瞭然。</span></div>
+    <div class="f"><span class="i">⏰</span><b>每月自動檢查</b><span>每月一號開啟就自動巡檢,四色分級告訴你該處理什麼。</span></div>
+    <div class="f"><span class="i">✔️</span><b>處理結案</b><span>處理完按一下結案,不再重複提醒,並留下完整處理軌跡。</span></div>
+    <div class="f"><span class="i">💰</span><b>損失統計</b><span>過期銷毀自動計算金額,月底看得到「這個月損失多少」。</span></div>
+    <div class="f"><span class="i">📉</span><b>低庫存提醒</b><span>設定安全存量,低於門檻自動提醒,不再等到缺貨才發現。</span></div>
+    <div class="f"><span class="i">🛒</span><b>叫貨清單</b><span>發現要補的直接加入清單,匯出或列印成叫貨單傳給廠商。</span></div>
+    <div class="f"><span class="i">🏷️</span><b>分類與貨架</b><span>標好分類與貨架代號,盤點時一區一區掃,找貨秒定位。</span></div>
+    <div class="f"><span class="i">🖨️</span><b>出清標籤列印</b><span>即期品自動算剩餘天數與建議折扣,列印貼貨架就能促銷。</span></div>
+    <div class="f"><span class="i">💡</span><b>相似品名提醒</b><span>同名不同劑量、不同廠牌會主動提示,避免登記錯品項。</span></div>
+    <div class="f"><span class="i">👥</span><b>多人使用</b><span>助理也能一起盤,每筆記錄標註是誰做的。</span></div>
+    <div class="f"><span class="i">📊</span><b>月報一鍵產生</b><span>盤點率、結案數、損失金額、待處理清單,月會直接用。</span></div>
+    <div class="f"><span class="i">🔔</span><b>每日待辦</b><span>開啟就看到今天要處理幾件,不用自己找。</span></div>
+    <div class="f"><span class="i">💾</span><b>備份與還原</b><span>一鍵備份存雲端,換手機也不怕資料消失。</span></div>
+    <div class="f"><span class="i">⚡</span><b>連掃模式</b><span>大量同效期商品可連續快掃,效率翻倍。</span></div>
+    <div class="f"><span class="i">🌙</span><b>深色模式</b><span>晚上盤庫房不刺眼,自動跟隨手機設定。</span></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>怎麼開始?三步驟</h2>
+  <div class="steps">
+    <div class="step"><b>上傳商品清單</b><span>把店裡的商品 Excel 匯入(有空白範本可下載)。只有「名稱」是必填,其他慢慢補。</span></div>
+    <div class="step"><b>開始掃碼登記</b><span>拿起手機掃條碼,填效期和數量。也可以只登記重點商品,不必一次盤完。</span></div>
+    <div class="step"><b>每個月開一次</b><span>系統告訴你該處理什麼,處理完按結案。月底一鍵產生報表。</span></div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>誰適合用?</h2>
+  <p class="lead">任何需要管理「有期限的東西」的店家。</p>
+  <div class="tags">
+    <span class="tag">藥局</span><span class="tag">診所</span><span class="tag">醫美・美容</span>
+    <span class="tag">餐飲・食材</span><span class="tag">烘焙</span><span class="tag">保健食品</span>
+    <span class="tag">寵物店</span><span class="tag">健身房</span><span class="tag">托育・長照</span>
+    <span class="tag">超商・雜貨</span>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>常見問題</h2>
+  <details><summary>需要下載 App 嗎?</summary><p>不用。點網址就能用。想要像 App 一樣有桌面圖示,用 Chrome 開啟後點「⋮ → 加到主畫面」即可,開起來是全螢幕,跟一般 App 沒兩樣。</p></details>
+  <details><summary>我的商品資料會被上傳嗎?</summary><p>不會。所有資料都存在你自己手機的瀏覽器中,不經過任何伺服器。也因此請記得定期使用「備份」功能,把備份檔存到雲端硬碟或傳給自己。</p></details>
+  <details><summary>沒有網路可以用嗎?</summary><p>可以。第一次開啟後會自動快取,之後即使沒網路也能掃碼、登記、查看警示。</p></details>
+  <details><summary>條碼掃不到怎麼辦?</summary><p>App 內建放大、手電筒與鏡頭切換功能。另外也有「拍照掃描」模式,用手機原生相機拍一張就能辨識。若要大量連續掃描,搭配一支藍牙掃描槍會更快。</p></details>
+  <details><summary>商品資料要怎麼準備?</summary><p>從你的 POS 或進銷存系統匯出 Excel 即可,欄位包含編號、條碼、名稱、單位、庫存等。App 內也提供空白範本下載。想先感受一下,可以直接按「範例資料試玩」。</p></details>
+  <details><summary>資料安全嗎?</summary><p>開啟需要 PIN 碼解鎖,首次使用時自行設定。資料不上傳雲端,也不會被搜尋引擎收錄。</p></details>
+  <details><summary>手機掉了怎麼辦?</summary><p>只要有定期備份,換新手機後用「還原備份」就能全部復原。建議每月備份一次,存到 Google 雲端硬碟。</p></details>
+</section>
+
+<div class="end">
+  <div class="wrap">
+    <h2>先試玩,再決定</h2>
+    <p>內建範例資料,打開就能感受完整功能,不用先準備任何檔案。</p>
+    <a class="cta" href="./trial/">👉 開始免費試用</a>
+    <p style="margin-top:18px;font-size:13px">建議用 Chrome 瀏覽器開啟</p>
+  </div>
+</div>
+
+<footer>
+  效期小幫手 · 由執業藥局實務需求打造<br>
+  本工具為效期管理輔助用途,不擔保因未及時處理造成之損失。<br>
+  使用前請自行評估是否符合貴店作業需求。
+</footer>
+
+</body>
+</html>

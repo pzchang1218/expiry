@@ -513,11 +513,22 @@ document.getElementById('photoScan').addEventListener('change', async e=>{
 });
 async function startCam(){
   const cfg = buildScanEngineCfg();
+  // 注意:videoConstraints 會「覆蓋」鏡頭選擇參數(先前自拍問題的元兇!)
+  // 因此高解析度設定必須與鏡頭指定「合併在同一份 videoConstraints」中
   const scanCfg = {
     fps: 15,
-    qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}),
-    videoConstraints: {width:{ideal:1920}, height:{ideal:1080}}
+    qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))})
   };
+  // 一次性重置:清掉先前在錯誤狀態下累積的跳過計數與黑名單
+  try{
+    if(!localStorage.getItem('pos-cam-fix2')){
+      localStorage.removeItem('pos-cam-id');
+      localStorage.setItem('pos-cam-skip','0');
+      localStorage.setItem('pos-cam-blacklist','[]');
+      localStorage.setItem('pos-cam-fix2','1');
+      camBlacklist = [];
+    }
+  }catch(e){}
   // 徹底清掉上一台掃描器,確保乾淨起步
   async function freshScanner(){
     if(scanner){ try{ await scanner.stop(); }catch(e){} try{ scanner.clear(); }catch(e){} }
@@ -549,7 +560,11 @@ async function startCam(){
   for(const cand of queue){
     try{
       await freshScanner();
-      await scanner.start(cand.t, scanCfg, code=>onScan(code), ()=>{});
+      // 鏡頭指定 + 高解析度 合併為同一份 videoConstraints(引擎才會乖乖聽話)
+      const camSpec = (typeof cand.t === 'string') ? {deviceId:{exact:cand.t}} : cand.t;
+      const runCfg = Object.assign({}, scanCfg,
+        { videoConstraints: Object.assign({}, camSpec, {width:{ideal:1920}, height:{ideal:1080}}) });
+      await scanner.start(cand.t, runCfg, code=>onScan(code), ()=>{});
       // 啟動後查驗:在黑名單裡(您親自認證過的自拍鏡)→ 直接換下一顆
       let runId = '';
       try{ const st = scanner.getRunningTrackSettings(); runId = (st && st.deviceId) || ''; }catch(e){}

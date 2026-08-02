@@ -825,7 +825,8 @@ function exportXlsx(){
   if(!records.length){ toast('還沒有記錄可匯出唷'); return; }
   const detail = records.map(r=>({
     '編號':r.pid,'條碼':r.bc,'名稱':r.name,'單位':r.unit,
-    '批號':r.batch,'效期':r.expiry,'數量':r.qty,'登記時間':r.ts
+    '批號':r.batch,'效期':r.expiry,'數量':r.qty,'登記時間':r.ts,
+    '處理狀態':r.done?('已處理 '+(r.doneTs||'')):''
   }));
   const groups = {};
   for(const r of records){
@@ -844,6 +845,10 @@ function exportXlsx(){
 }
 
 /* ================= 效期警示 ================= */
+// 品項客製規則:名稱含關鍵字者,僅在指定天數內才提醒(已過期仍會提醒)
+const ALERT_RULES = [
+  {match:'惠香', maxDays:31} // 惠香系列:到期前1個月才通知
+];
 const TIERS = [
   {key:'past', label:'已過期',  chip:'tc-past', cls:'al-past', color:'#b3261e'},
   {key:'m1',   label:'1個月內', chip:'tc-m1',   cls:'al-m1',   color:'#e65100'},
@@ -861,9 +866,12 @@ function buildAlerts(){
   const now = new Date(); now.setHours(0,0,0,0);
   const out = {past:[], m1:[], m3:[], m6:[]};
   for(const r of records){
+    if(r.done) continue; // 已處理結案 → 不再警示
     const d = expDate(r.expiry);
     if(!d) continue;
     const days = Math.round((d-now)/86400000);
+    const rule = ALERT_RULES.find(x => (r.name||'').includes(x.match));
+    if(rule && days > rule.maxDays) continue; // 客製規則:還沒到通知時間
     let key = null;
     if(days<0) key='past';
     else if(days<=31) key='m1';
@@ -873,6 +881,7 @@ function buildAlerts(){
   }
   for(const k of ['past','m1','m3','m6']) out[k].sort((a,b)=>a.days-b.days);
   out.total = out.past.length+out.m1.length+out.m3.length+out.m6.length;
+  out.doneList = records.filter(r=>r.done);
   return out;
 }
 function renderAlert(){
@@ -881,16 +890,46 @@ function renderAlert(){
   document.getElementById('tierChips').innerHTML = TIERS.map(t=>
     `<div class="tier-chip ${t.chip}"><div class="n">${a[t.key].length}</div><div class="t">${t.label}</div></div>`).join('');
   const list = document.getElementById('alertList');
+  let html = '';
   if(!a.total){
-    list.innerHTML = '<p class="muted center" style="padding:14px 0">🎉 目前沒有 6 個月內到期或已過期的商品,太棒了!</p>';
-    return;
+    html = '<p class="muted center" style="padding:14px 0">🎉 目前沒有需要處理的效期警示,太棒了!</p>';
+  }else{
+    html = TIERS.map(t=>
+      a[t.key].map(r=>`<div class="alert-item ${t.cls}">
+        <div class="nm">${esc(r.name)}<span class="badge" style="background:${t.color}">${t.label}</span></div>
+        <div class="dt">效期 <b>${esc(r.expiry)}</b> ${r.days<0?'(已過期 '+(-r.days)+' 天)':'(剩 '+r.days+' 天)'}｜批 ${esc(r.batch||'—')}｜${r.qty} ${esc(r.unit||'')}</div>
+        <button class="btn-sm btn-line" style="margin-top:8px" onclick="markDone('${r.rid}')">✔ 已處理,結案</button>
+      </div>`).join('')
+    ).join('');
   }
-  list.innerHTML = TIERS.map(t=>
-    a[t.key].map(r=>`<div class="alert-item ${t.cls}">
-      <div class="nm">${esc(r.name)}<span class="badge" style="background:${t.color}">${t.label}</span></div>
-      <div class="dt">效期 <b>${esc(r.expiry)}</b> ${r.days<0?'(已過期 '+(-r.days)+' 天)':'(剩 '+r.days+' 天)'}｜批 ${esc(r.batch||'—')}｜${r.qty} ${esc(r.unit||'')}</div>
-    </div>`).join('')
-  ).join('');
+  if(a.doneList.length){
+    html += `<details style="margin-top:12px">
+      <summary style="cursor:pointer;font-size:14px;color:var(--brand-dk);font-weight:700">✅ 已處理結案 ${a.doneList.length} 筆(點開查看)</summary>
+      ${a.doneList.map(r=>`<div class="rec-batch" style="margin-top:6px">
+        <span>${esc(r.name)}｜效期 ${esc(r.expiry)}${r.doneTs?'｜'+esc(r.doneTs)+' 結案':''}</span>
+        <button class="btn-sm btn-line" onclick="undoDone('${r.rid}')">復原</button>
+        <span></span>
+      </div>`).join('')}
+    </details>`;
+  }
+  list.innerHTML = html;
+}
+async function markDone(rid){
+  const r = records.find(x=>x.rid===rid);
+  if(!r) return;
+  r.done = true;
+  r.doneTs = new Date().toLocaleString('zh-TW',{hour12:false});
+  await sSet('pos-records', JSON.stringify(records));
+  renderAlert();
+  toast('✓ 已結案:'+r.name.slice(0,12));
+}
+async function undoDone(rid){
+  const r = records.find(x=>x.rid===rid);
+  if(!r) return;
+  r.done = false; delete r.doneTs;
+  await sSet('pos-records', JSON.stringify(records));
+  renderAlert();
+  toast('已復原為待處理');
 }
 async function monthlyCheck(){
   const now = new Date();

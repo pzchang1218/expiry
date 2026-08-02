@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>執刀紀事 · 手術成就紀錄</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --ink:#181d3a; --ink2:#5d6485; --faint:#9aa0bd;
+  --paper:#f6f4ee; --card:#ffffff; --line:#e3e0d6;
+  --brass:#a8792c; --brass-lt:#f4ecd9;
+  --deep:#232a52; --plum:#6b4b74; --sage:#4a7a68;
+  --r:14px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); font-size:16px; padding-bottom:88px;
+}
+.serif{font-family:"Noto Serif TC",Georgia,"Times New Roman",serif;}
+header{
+  background:linear-gradient(150deg,#181d3a 0%,#2b3260 60%,#3a3568 100%);
+  color:#fff; padding:20px 18px 18px; position:relative; overflow:hidden;
+}
+header::after{
+  content:""; position:absolute; right:-40px; top:-40px; width:160px; height:160px;
+  border:1px solid rgba(212,175,110,.35); border-radius:50%;
+}
+header .eyebrow{font-size:11px; letter-spacing:4px; color:#d4af6e; margin:0;}
+header h1{margin:4px 0 0; font-size:23px; font-weight:500; letter-spacing:3px;}
+header .sub{margin:6px 0 0; font-size:12px; color:#b6bcd8;}
+main{padding:16px; max-width:720px; margin:0 auto;}
+.card{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:16px; margin-bottom:14px;}
+.card h2{margin:0 0 12px; font-size:13px; letter-spacing:2px; color:var(--ink2); font-weight:700;}
+button{font-family:inherit; border:none; border-radius:10px; cursor:pointer; font-weight:700;}
+.btn{background:var(--deep); color:#fff; padding:14px; width:100%; font-size:16px;}
+.btn2{background:var(--brass-lt); color:var(--brass); padding:12px; width:100%; font-size:15px;}
+.btn-s{padding:7px 12px; font-size:13px; background:var(--paper); color:var(--ink2); border:1px solid var(--line);}
+.btn-x{padding:7px 12px; font-size:13px; background:#fbeceb; color:#a3382f;}
+input,select,textarea{
+  font-family:inherit; font-size:16px; width:100%; padding:11px;
+  border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--ink);
+}
+input:focus,select:focus{outline:2px solid var(--brass); border-color:var(--brass);}
+label{font-size:12px; color:var(--ink2); font-weight:700; display:block; margin:12px 0 5px; letter-spacing:1px;}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;}
+.hidden{display:none !important;}
+.muted{color:var(--ink2); font-size:13px;}
+.tiny{color:var(--faint); font-size:11px;}
+
+/* 主數字 */
+.hero{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.hero .big{
+  grid-column:1/-1; background:linear-gradient(140deg,#232a52,#3b3a6b);
+  color:#fff; border-radius:var(--r); padding:20px; text-align:center; position:relative; overflow:hidden;
+}
+.hero .big::before{
+  content:""; position:absolute; left:50%; top:-60px; transform:translateX(-50%);
+  width:240px; height:240px; border:1px solid rgba(212,175,110,.25); border-radius:50%;
+}
+.hero .big .n{font-size:52px; line-height:1; color:#f0dcb4; position:relative;}
+.hero .big .l{font-size:12px; letter-spacing:3px; color:#b6bcd8; margin-top:8px; position:relative;}
+.mini{background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:14px; text-align:center;}
+.mini .n{font-size:26px; line-height:1.1; color:var(--deep);}
+.mini .l{font-size:11px; color:var(--ink2); letter-spacing:1px; margin-top:5px;}
+
+/* 圖表 */
+.chart{width:100%; overflow:visible;}
+.bar-row{display:grid; grid-template-columns:78px 1fr 54px; gap:8px; align-items:center; margin-bottom:7px; font-size:13px;}
+.bar-track{background:var(--paper); border-radius:99px; height:16px; overflow:hidden;}
+.bar-fill{height:100%; border-radius:99px;}
+.bar-val{text-align:right; color:var(--ink2); font-size:12px;}
+
+/* 里程碑 */
+.badges{display:flex; flex-wrap:wrap; gap:8px;}
+.badge{
+  border:1px solid var(--line); border-radius:12px; padding:9px 11px; font-size:12px;
+  background:var(--paper); color:var(--faint); text-align:center; min-width:78px;
+}
+.badge.got{background:linear-gradient(140deg,#fff8e8,#f4e6c4); border-color:#dcc189; color:var(--brass); font-weight:700;}
+.badge .i{font-size:19px; display:block; margin-bottom:2px;}
+
+/* 列表 */
+.case{border-bottom:1px solid var(--line); padding:11px 2px;}
+.case:last-child{border-bottom:none;}
+.case-h{display:flex; justify-content:space-between; align-items:baseline; gap:8px;}
+.case .d{font-size:12px; color:var(--faint); letter-spacing:1px;}
+.case .t{font-weight:700; font-size:15px;}
+.case .m{font-size:13px; color:var(--ink2); margin-top:3px;}
+.case .acts{margin-top:7px; display:flex; gap:7px;}
+.pill{display:inline-block; font-size:11px; padding:2px 8px; border-radius:99px; background:var(--brass-lt); color:var(--brass); margin-left:6px;}
+
+.tabs{position:fixed; bottom:0; left:0; right:0; z-index:30; background:var(--card);
+  border-top:1px solid var(--line); display:flex; padding-bottom:env(safe-area-inset-bottom);}
+.tabs button{flex:1; background:none; padding:11px 0 9px; border-radius:0; font-size:12px;
+  color:var(--ink2); font-weight:600; display:flex; flex-direction:column; align-items:center; gap:3px;}
+.tabs button.active{color:var(--brass);}
+.tabs .ico{font-size:20px; line-height:1;}
+.toast{position:fixed; left:50%; transform:translateX(-50%); bottom:96px; z-index:50;
+  background:var(--ink); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px;
+  opacity:0; transition:opacity .25s; pointer-events:none; max-width:88%;}
+.toast.show{opacity:.95;}
+.note{background:var(--brass-lt); border-left:4px solid var(--brass); border-radius:8px;
+  padding:11px; font-size:12.5px; line-height:1.8; color:#6a5320;}
+</style>
+</head>
+<body>
+
+<!-- ===== PIN ===== -->
+<div id="lock" style="position:fixed;inset:0;z-index:999;background:linear-gradient(150deg,#181d3a,#3a3568);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:#fff;border-radius:18px;padding:30px 22px;max-width:340px;width:100%;text-align:center;">
+    <div style="font-size:34px">🗝️</div>
+    <h2 id="lkTitle" class="serif" style="margin:8px 0 4px;font-size:19px;letter-spacing:2px;">執刀紀事</h2>
+    <p id="lkSub" class="muted" style="margin:0 0 16px">請輸入 PIN 碼</p>
+    <input id="lkInput" type="password" inputmode="numeric" maxlength="6"
+      style="font-size:24px;text-align:center;letter-spacing:9px;">
+    <p id="lkErr" style="min-height:18px;margin:8px 0 4px;font-size:13px;color:#a3382f;"></p>
+    <label style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;margin:0 0 12px;cursor:pointer;">
+      <input type="checkbox" id="lkRemember" checked style="width:auto;">記住這台裝置 30 天
+    </label>
+    <button class="btn" id="lkBtn" onclick="unlock()">解鎖</button>
+  </div>
+</div>
+
+<header>
+  <p class="eyebrow">SURGICAL JOURNAL</p>
+  <h1 class="serif">執刀紀事</h1>
+  <p class="sub" id="hdSub">個人手術成就紀錄 · 資料僅存於本機</p>
+</header>
+
+<main>
+
+<!-- ===== 儀表板 ===== -->
+<section id="vDash">
+  <div class="hero" style="margin-bottom:14px">
+    <div class="big">
+      <div class="n serif" id="kCases">0</div>
+      <div class="l">累 計 案 例</div>
+    </div>
+    <div class="mini"><div class="n serif" id="kGrafts">0</div><div class="l">累計移植株數</div></div>
+    <div class="mini"><div class="n serif" id="kAvg">0</div><div class="l">平均每例株數</div></div>
+    <div class="mini"><div class="n serif" id="kYear">0</div><div class="l">今年案例</div></div>
+    <div class="mini"><div class="n serif" id="kSpan">—</div><div class="l">執刀年資</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🏆 里 程 碑</h2>
+    <div class="badges" id="badgeBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>📈 逐 月 案 例 數</h2>
+    <div id="trendBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔬 術 式 分 布</h2>
+    <div id="procBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>📍 部 位 分 布</h2>
+    <div id="siteBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>👥 患 者 樣 貌</h2>
+    <div id="demoBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>📅 年 度 回 顧</h2>
+    <div id="yearBox"></div>
+  </div>
+</section>
+
+<!-- ===== 新增/編輯 ===== -->
+<section id="vAdd" class="hidden">
+  <div class="card">
+    <h2 id="fTitle">✍️ 新 增 案 例</h2>
+    <div class="note">請勿填入姓名、病歷號等可識別個資 — 統計不需要,也讓資料更安全。</div>
+    <label>手術日期</label>
+    <input id="fDate" type="date">
+    <div class="row2">
+      <div><label>術式</label><input id="fProc" list="procList" placeholder="FUE / FUT…" autocomplete="off">
+        <datalist id="procList"><option>FUE</option><option>FUT</option><option>混合式</option><option>ARTAS</option><option>其他</option></datalist></div>
+      <div><label>部位</label><input id="fSite" list="siteList" placeholder="髮際線 / 頭頂…" autocomplete="off">
+        <datalist id="siteList"><option>髮際線</option><option>頭頂</option><option>M型角</option><option>鬢角</option><option>眉毛</option><option>鬍鬚</option><option>疤痕區</option><option>其他</option></datalist></div>
+    </div>
+    <div class="row3">
+      <div><label>移植株數</label><input id="fGraft" type="number" inputmode="numeric" placeholder="2500"></div>
+      <div><label>年齡</label><input id="fAge" type="number" inputmode="numeric" placeholder="35"></div>
+      <div><label>性別</label><select id="fSex"><option value="">—</option><option>男</option><option>女</option><option>其他</option></select></div>
+    </div>
+    <div class="row2">
+      <div><label>手術時長(小時)</label><input id="fHours" type="number" step="0.5" inputmode="decimal" placeholder="6"></div>
+      <div><label>滿意度(1-5)</label><select id="fScore"><option value="">—</option><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+    </div>
+    <label>備註(技術心得、特殊狀況)</label>
+    <textarea id="fNote" rows="2" placeholder="例:捐贈區密度佳,採用小號打孔器"></textarea>
+    <div class="row2" style="margin-top:16px">
+      <button class="btn-s" style="padding:14px" onclick="resetForm()">清空</button>
+      <button class="btn" id="fSubmit" onclick="saveCase()">✓ 記下這一台</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 案例列表 ===== -->
+<section id="vList" class="hidden">
+  <div class="card">
+    <input id="lFilter" placeholder="🔍 搜尋(術式 / 部位 / 備註 / 年份)" autocomplete="off">
+    <div class="row2" style="margin-top:8px">
+      <select id="lSort" onchange="renderList()">
+        <option value="new">日期:新 → 舊</option>
+        <option value="old">日期:舊 → 新</option>
+        <option value="graft">株數:多 → 少</option>
+      </select>
+      <span class="muted" id="lCount" style="align-self:center;text-align:right"></span>
+    </div>
+  </div>
+  <div class="card" id="listBox"></div>
+</section>
+
+<!-- ===== 資料管理 ===== -->
+<section id="vData" class="hidden">
+  <div class="card">
+    <h2>📥 匯 入</h2>
+    <p class="muted" style="margin:0 0 10px">從診所系統匯出 Excel 後上傳。欄位標題需含:<br>
+      <b>日期、術式、部位、株數、年齡、性別</b>(時長、滿意度、備註選填)</p>
+    <input type="file" id="impFile" accept=".xlsx,.xls,.csv" class="hidden">
+    <button class="btn2" onclick="document.getElementById('impFile').click()">📂 選擇 Excel 匯入</button>
+    <button class="btn2" style="margin-top:8px" onclick="dlTemplate()">📄 下載匯入範本</button>
+    <div class="note" style="margin-top:10px">匯入前請先在 Excel 中<b>刪除姓名、病歷號等個資欄位</b>。</div>
+  </div>
+  <div class="card">
+    <h2>📤 匯 出 與 備 份</h2>
+    <button class="btn2" onclick="exportXlsx()">⬇️ 匯出 Excel(含統計表)</button>
+    <button class="btn2" style="margin-top:8px" onclick="backup()">💾 備份資料檔</button>
+    <button class="btn2" style="margin-top:8px" onclick="document.getElementById('resFile').click()">📂 還原備份</button>
+    <input type="file" id="resFile" accept=".json" class="hidden">
+  </div>
+  <div class="card">
+    <h2>⚙️ 其 他</h2>
+    <button class="btn-s" style="width:100%;padding:12px" onclick="changePin()">🗝️ 變更 PIN 碼</button>
+    <button class="btn-x" style="width:100%;padding:12px;margin-top:8px" onclick="wipe()">🗑 清除全部資料</button>
+    <p class="tiny" style="text-align:center;margin-top:14px">執刀紀事 · 資料僅存於本機瀏覽器,請定期備份</p>
+  </div>
+</section>
+
+</main>
+
+<nav class="tabs" id="tabs" style="display:none">
+  <button id="tD" class="active" onclick="go('dash')"><span class="ico">📊</span>成就</button>
+  <button id="tA" onclick="go('add')"><span class="ico">✍️</span>新增</button>
+  <button id="tL" onclick="go('list')"><span class="ico">📖</span>案例</button>
+  <button id="tX" onclick="go('data')"><span class="ico">⚙️</span>資料</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 儲存 ============ */
+let cases = [], editIdx = null, PIN = 0;
+const K = {pin:'sj-pin', until:'sj-until', data:'sj-cases'};
+function ls(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function save(){ lsSet(K.data, JSON.stringify(cases)); }
+
+/* ============ PIN ============ */
+function hash(s){ s='sj:'+s; let h=5381; for(let i=0;i<s.length;i++) h=(Math.imul(h,33)+s.charCodeAt(i))>>>0; return h; }
+(function(){
+  PIN = parseInt(ls(K.pin)||'0',10)||0;
+  if(!PIN){
+    document.getElementById('lkTitle').textContent='歡迎使用執刀紀事';
+    document.getElementById('lkSub').textContent='請設定 4~6 位數 PIN 碼';
+    document.getElementById('lkBtn').textContent='設定並開始';
+  }else if(Date.now() < (+ls(K.until)||0)){ boot(); return; }
+  document.getElementById('lkInput').addEventListener('keydown',e=>{ if(e.key==='Enter') unlock(); });
+  setTimeout(()=>document.getElementById('lkInput').focus(),300);
+})();
+function unlock(){
+  const v = document.getElementById('lkInput').value.trim();
+  if(!PIN){
+    if(!/^\d{4,6}$/.test(v)){ document.getElementById('lkErr').textContent='請輸入 4~6 位數字'; return; }
+    PIN = hash(v); lsSet(K.pin, String(PIN));
+    alert('PIN 已設定為:'+v+'\n\n請記下來!忘記需清除資料重設。');
+  }else if(hash(v)!==PIN){
+    document.getElementById('lkErr').textContent='PIN 不正確';
+    document.getElementById('lkInput').value=''; return;
+  }
+  if(document.getElementById('lkRemember').checked) lsSet(K.until, String(Date.now()+30*86400000));
+  boot();
+}
+function changePin(){
+  const v = prompt('輸入新的 4~6 位數 PIN 碼'); if(v===null) return;
+  if(!/^\d{4,6}$/.test(v.trim())){ toast('格式不符,需 4~6 位數字'); return; }
+  PIN = hash(v.trim()); lsSet(K.pin, String(PIN)); lsSet(K.until,'0');
+  toast('PIN 已更新為 '+v.trim());
+}
+function boot(){
+  document.getElementById('lock').style.display='none';
+  document.getElementById('tabs').style.display='flex';
+  try{ cases = JSON.parse(ls(K.data)||'[]'); }catch(e){ cases=[]; }
+  const t=new Date(); document.getElementById('fDate').value =
+    t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+  render();
+}
+
+/* ============ 導覽 ============ */
+function go(v){
+  ['dash','add','list','data'].forEach(x=>
+    document.getElementById('v'+x[0].toUpperCase()+x.slice(1)).classList.toggle('hidden', x!==v));
+  const m={dash:'tD',add:'tA',list:'tL',data:'tX'};
+  Object.values(m).forEach(id=>document.getElementById(id).classList.remove('active'));
+  document.getElementById(m[v]).classList.add('active');
+  if(v==='dash') renderDash();
+  if(v==='list') renderList();
+}
+
+/* ============ 新增 / 編輯 ============ */
+function resetForm(){
+  editIdx=null;
+  document.getElementById('fTitle').textContent='✍️ 新 增 案 例';
+  document.getElementById('fSubmit').textContent='✓ 記下這一台';
+  ['fProc','fSite','fGraft','fAge','fHours','fNote'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('fSex').value=''; document.getElementById('fScore').value='';
+}
+function saveCase(){
+  const date = document.getElementById('fDate').value;
+  if(!date){ toast('請選擇手術日期'); return; }
+  const c = {
+    id: editIdx!==null ? cases[editIdx].id : 'c'+Date.now()+Math.random().toString(36).slice(2,5),
+    date,
+    proc: document.getElementById('fProc').value.trim() || '未分類',
+    site: document.getElementById('fSite').value.trim() || '未註明',
+    graft: +document.getElementById('fGraft').value || 0,
+    age: +document.getElementById('fAge').value || 0,
+    sex: document.getElementById('fSex').value,
+    hours: +document.getElementById('fHours').value || 0,
+    score: +document.getElementById('fScore').value || 0,
+    note: document.getElementById('fNote').value.trim()
+  };
+  if(editIdx!==null){ cases[editIdx]=c; toast('✓ 已更新'); }
+  else{ cases.push(c); toast('✓ 第 '+cases.length+' 台,記下了!'); }
+  save(); resetForm(); render();
+  if(editIdx===null) checkMilestone();
+}
+function editCase(id){
+  const i = cases.findIndex(c=>c.id===id); if(i<0) return;
+  editIdx = i; const c = cases[i];
+  document.getElementById('fTitle').textContent='✏️ 編 輯 案 例';
+  document.getElementById('fSubmit').textContent='✓ 儲存修改';
+  document.getElementById('fDate').value=c.date;
+  document.getElementById('fProc').value=c.proc==='未分類'?'':c.proc;
+  document.getElementById('fSite').value=c.site==='未註明'?'':c.site;
+  document.getElementById('fGraft').value=c.graft||'';
+  document.getElementById('fAge').value=c.age||'';
+  document.getElementById('fSex').value=c.sex||'';
+  document.getElementById('fHours').value=c.hours||'';
+  document.getElementById('fScore').value=c.score||'';
+  document.getElementById('fNote').value=c.note||'';
+  go('add'); window.scrollTo({top:0,behavior:'smooth'});
+}
+function delCase(id){
+  if(!confirm('確定刪除這筆案例紀錄?')) return;
+  cases = cases.filter(c=>c.id!==id); save(); render(); toast('已刪除');
+}
+
+/* ============ 統計 ============ */
+const fmt = n => (n||0).toLocaleString('en-US');
+function stats(){
+  const g = cases.reduce((s,c)=>s+(c.graft||0),0);
+  const y = new Date().getFullYear();
+  const withG = cases.filter(c=>c.graft>0);
+  const dates = cases.map(c=>c.date).filter(Boolean).sort();
+  let span='—';
+  if(dates.length){
+    const a=new Date(dates[0]), b=new Date(dates[dates.length-1]);
+    const mo = Math.max(0,(b.getFullYear()-a.getFullYear())*12 + b.getMonth()-a.getMonth());
+    span = mo>=12 ? (Math.floor(mo/12)+' 年'+(mo%12?mo%12+'月':'')) : (mo+' 個月');
+  }
+  return {
+    n: cases.length, grafts: g,
+    avg: withG.length ? Math.round(g/withG.length) : 0,
+    thisYear: cases.filter(c=>(c.date||'').slice(0,4)==String(y)).length,
+    span,
+    hours: cases.reduce((s,c)=>s+(c.hours||0),0)
+  };
+}
+function tally(key){
+  const m={};
+  for(const c of cases){ const k=c[key]||'未註明'; m[k]=(m[k]||0)+1; }
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+function bars(pairs, color){
+  if(!pairs.length) return '<p class="muted">尚無資料</p>';
+  const max = Math.max(...pairs.map(p=>p[1]));
+  const tot = pairs.reduce((s,p)=>s+p[1],0);
+  return pairs.map(([k,v])=>`<div class="bar-row">
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</span>
+    <span class="bar-track"><span class="bar-fill" style="width:${Math.max(4,v/max*100)}%;background:${color}"></span></span>
+    <span class="bar-val">${v}<span class="tiny"> ${Math.round(v/tot*100)}%</span></span>
+  </div>`).join('');
+}
+
+/* ============ 渲染 ============ */
+function render(){ renderDash(); renderList(); }
+function renderDash(){
+  const s = stats();
+  document.getElementById('kCases').textContent = fmt(s.n);
+  document.getElementById('kGrafts').textContent = fmt(s.grafts);
+  document.getElementById('kAvg').textContent = fmt(s.avg);
+  document.getElementById('kYear').textContent = fmt(s.thisYear);
+  document.getElementById('kSpan').textContent = s.span;
+  document.getElementById('hdSub').textContent =
+    s.n ? `${fmt(s.n)} 台手術 · ${fmt(s.grafts)} 株毛囊 · 累計 ${Math.round(s.hours)} 小時` : '個人手術成就紀錄 · 資料僅存於本機';
+
+  // 里程碑
+  const MS = [
+    {t:10,i:'🌱',l:'10 例'},{t:50,i:'🌿',l:'50 例'},{t:100,i:'🏅',l:'100 例'},
+    {t:300,i:'🎖️',l:'300 例'},{t:500,i:'🏆',l:'500 例'},{t:1000,i:'👑',l:'1000 例'}
+  ];
+  const GS = [
+    {t:100000,i:'✨',l:'10 萬株'},{t:500000,i:'💫',l:'50 萬株'},
+    {t:1000000,i:'🌟',l:'100 萬株'},{t:3000000,i:'💎',l:'300 萬株'}
+  ];
+  document.getElementById('badgeBox').innerHTML =
+    MS.map(m=>`<div class="badge ${s.n>=m.t?'got':''}"><span class="i">${s.n>=m.t?m.i:'🔒'}</span>${m.l}</div>`).join('')
+  + GS.map(m=>`<div class="badge ${s.grafts>=m.t?'got':''}"><span class="i">${s.grafts>=m.t?m.i:'🔒'}</span>${m.l}</div>`).join('');
+
+  // 逐月趨勢(近 24 個月)
+  const mm={};
+  for(const c of cases){ const k=(c.date||'').slice(0,7); if(k) mm[k]=(mm[k]||0)+1; }
+  const keys = Object.keys(mm).sort().slice(-24);
+  const box = document.getElementById('trendBox');
+  if(!keys.length){ box.innerHTML='<p class="muted">尚無資料</p>'; }
+  else{
+    const max = Math.max(...keys.map(k=>mm[k]));
+    const W = 700, H = 170, pad = 26, bw = (W-pad*2)/keys.length;
+    box.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H+30}" preserveAspectRatio="xMidYMid meet">
+      <line x1="${pad}" y1="${H}" x2="${W-pad}" y2="${H}" stroke="var(--line)"/>
+      ${keys.map((k,i)=>{
+        const h = Math.max(3, mm[k]/max*(H-34));
+        const x = pad + i*bw + bw*0.16, w = bw*0.68;
+        return `<rect x="${x}" y="${H-h}" width="${w}" height="${h}" rx="3" fill="#3b3a6b"/>
+          <text x="${x+w/2}" y="${H-h-5}" font-size="11" fill="#5d6485" text-anchor="middle">${mm[k]}</text>
+          ${(keys.length<=12 || i%2===0) ? `<text x="${x+w/2}" y="${H+16}" font-size="10" fill="#9aa0bd" text-anchor="middle">${k.slice(2).replace('-','/')}</text>`:''}`;
+      }).join('')}
+    </svg>`;
+  }
+
+  document.getElementById('procBox').innerHTML = bars(tally('proc'), 'linear-gradient(90deg,#3b3a6b,#6b4b74)');
+  document.getElementById('siteBox').innerHTML = bars(tally('site'), 'linear-gradient(90deg,#4a7a68,#7fae96)');
+
+  // 患者樣貌
+  const ages = cases.filter(c=>c.age>0).map(c=>c.age);
+  const buckets = [[0,29,'29 歲以下'],[30,39,'30-39 歲'],[40,49,'40-49 歲'],[50,59,'50-59 歲'],[60,200,'60 歲以上']];
+  const agePairs = buckets.map(([a,b,l])=>[l, ages.filter(v=>v>=a&&v<=b).length]).filter(p=>p[1]);
+  const sexPairs = tally('sex').filter(p=>p[0]!=='未註明' && p[0]!=='');
+  document.getElementById('demoBox').innerHTML =
+    (ages.length? `<p class="tiny" style="margin:0 0 6px">平均年齡 ${Math.round(ages.reduce((a,b)=>a+b,0)/ages.length)} 歲</p>`+bars(agePairs,'linear-gradient(90deg,#a8792c,#d4af6e)') : '<p class="muted">尚無年齡資料</p>')
+    + (sexPairs.length? '<div style="height:10px"></div>'+bars(sexPairs,'linear-gradient(90deg,#5d6485,#9aa0bd)') : '');
+
+  // 年度回顧
+  const yy={};
+  for(const c of cases){ const k=(c.date||'').slice(0,4); if(k){ yy[k]=yy[k]||{n:0,g:0}; yy[k].n++; yy[k].g+=c.graft||0; } }
+  const ys = Object.keys(yy).sort().reverse();
+  document.getElementById('yearBox').innerHTML = ys.length
+    ? ys.map(y=>`<div class="bar-row" style="grid-template-columns:60px 1fr auto">
+        <b>${y}</b>
+        <span class="muted">${yy[y].n} 台手術</span>
+        <span class="bar-val">${fmt(yy[y].g)} 株</span></div>`).join('')
+    : '<p class="muted">尚無資料</p>';
+}
+document.getElementById('lFilter').addEventListener('input', renderList);
+function renderList(){
+  const f = (document.getElementById('lFilter').value||'').trim().toLowerCase();
+  const terms = f.split(/\s+/).filter(Boolean);
+  let arr = cases.filter(c=>{
+    if(!terms.length) return true;
+    const hay = [c.date,c.proc,c.site,c.note,c.sex].join(' ').toLowerCase();
+    return terms.every(t=>hay.includes(t));
+  });
+  const sort = document.getElementById('lSort').value;
+  arr.sort((a,b)=> sort==='graft' ? (b.graft-a.graft)
+    : sort==='old' ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date));
+  document.getElementById('lCount').textContent = arr.length + ' / ' + cases.length + ' 筆';
+  document.getElementById('listBox').innerHTML = arr.length
+    ? arr.slice(0,300).map(c=>`<div class="case">
+        <div class="case-h">
+          <span class="t">${esc(c.proc)}<span class="pill">${esc(c.site)}</span></span>
+          <span class="d">${esc(c.date)}</span>
+        </div>
+        <div class="m">${c.graft?fmt(c.graft)+' 株':'株數未填'}${c.age?'｜'+c.age+' 歲':''}${c.sex?'｜'+esc(c.sex):''}${c.hours?'｜'+c.hours+' 小時':''}${c.score?'｜滿意度 '+'★'.repeat(c.score):''}</div>
+        ${c.note?`<div class="m" style="color:var(--faint)">${esc(c.note)}</div>`:''}
+        <div class="acts">
+          <button class="btn-s" onclick="editCase('${c.id}')">編輯</button>
+          <button class="btn-x" onclick="delCase('${c.id}')">刪除</button>
+        </div>
+      </div>`).join('')
+    : '<p class="muted center" style="text-align:center;padding:16px 0">還沒有案例,到「新增」記下第一台吧 ✍️</p>';
+}
+
+/* ============ 里程碑慶祝 ============ */
+function checkMilestone(){
+  const s = stats();
+  const hit = [10,50,100,300,500,1000].includes(s.n);
+  if(hit) setTimeout(()=>alert('🎉 恭喜達成 '+s.n+' 例手術!\n\n累計 '+fmt(s.grafts)+' 株毛囊,'+s.span+'的累積。\n每一台都是紮實的功夫。'), 400);
+}
+
+/* ============ 匯入 / 匯出 ============ */
+const norm = s => String(s||'').trim();
+document.getElementById('impFile').addEventListener('change', e=>{
+  const file=e.target.files[0]; e.target.value=''; if(!file) return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const wb = XLSX.read(ev.target.result,{type:'array'});
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});
+      const pick=(r,names)=>{ for(const n of names){ for(const k of Object.keys(r)){ if(String(k).trim()===n) return r[k]; } } return ''; };
+      let n=0;
+      for(const r of rows){
+        let d = pick(r,['日期','手術日期','date','Date']);
+        if(typeof d==='number'){ const dt=XLSX.SSF.parse_date_code(d); if(dt) d=`${dt.y}-${String(dt.m).padStart(2,'0')}-${String(dt.d).padStart(2,'0')}`; }
+        d = norm(d).replace(/\//g,'-');
+        const m = d.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if(!m) continue;
+        d = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+        cases.push({
+          id:'c'+Date.now()+Math.random().toString(36).slice(2,6),
+          date:d,
+          proc: norm(pick(r,['術式','手術方式','proc']))||'未分類',
+          site: norm(pick(r,['部位','移植部位','site']))||'未註明',
+          graft: parseInt(pick(r,['株數','移植株數','毛囊數','grafts']),10)||0,
+          age: parseInt(pick(r,['年齡','age']),10)||0,
+          sex: norm(pick(r,['性別','sex'])),
+          hours: parseFloat(pick(r,['時長','手術時長','hours']))||0,
+          score: parseInt(pick(r,['滿意度','score']),10)||0,
+          note: norm(pick(r,['備註','note']))
+        });
+        n++;
+      }
+      if(!n){ toast('讀不到有效資料,請確認有「日期」欄位'); return; }
+      save(); render(); go('dash');
+      toast('✓ 匯入 '+n+' 筆案例');
+    }catch(err){ toast('匯入失敗:'+err.message); }
+  };
+  rd.readAsArrayBuffer(file);
+});
+function dlTemplate(){
+  const rows=[{'日期':'2026-01-15','術式':'FUE','部位':'髮際線','株數':2500,'年齡':35,'性別':'男','時長':6,'滿意度':5,'備註':'範例列,可刪除'}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows),'案例');
+  XLSX.writeFile(wb,'執刀紀事_匯入範本.xlsx');
+}
+function exportXlsx(){
+  if(!cases.length){ toast('還沒有資料可匯出'); return; }
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    cases.slice().sort((a,b)=>a.date.localeCompare(b.date)).map(c=>({
+      '日期':c.date,'術式':c.proc,'部位':c.site,'株數':c.graft,
+      '年齡':c.age||'','性別':c.sex,'時長':c.hours||'','滿意度':c.score||'','備註':c.note}))),'案例明細');
+  const s=stats();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+    {'項目':'累計案例','數值':s.n},{'項目':'累計移植株數','數值':s.grafts},
+    {'項目':'平均每例株數','數值':s.avg},{'項目':'今年案例','數值':s.thisYear},
+    {'項目':'執刀年資','數值':s.span},{'項目':'累計手術時數','數值':Math.round(s.hours)}
+  ]),'總覽');
+  const yy={};
+  for(const c of cases){ const k=(c.date||'').slice(0,4); if(k){ yy[k]=yy[k]||{n:0,g:0}; yy[k].n++; yy[k].g+=c.graft||0; } }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    Object.keys(yy).sort().map(y=>({'年度':y,'案例數':yy[y].n,'移植株數':yy[y].g}))),'年度統計');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    tally('proc').map(([k,v])=>({'術式':k,'案例數':v}))),'術式分布');
+  const d=new Date();
+  XLSX.writeFile(wb,`執刀紀事_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+  toast('已匯出');
+}
+function backup(){
+  const blob=new Blob([JSON.stringify({app:'執刀紀事',ver:1,at:new Date().toISOString(),cases})],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  const d=new Date();
+  a.download=`執刀紀事備份_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000);
+  toast('✓ 已備份(建議存到雲端)');
+}
+document.getElementById('resFile').addEventListener('change', e=>{
+  const file=e.target.files[0]; e.target.value=''; if(!file) return;
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    try{
+      const d=JSON.parse(ev.target.result);
+      if(!Array.isArray(d.cases)) throw new Error('備份檔格式不符');
+      if(!confirm('備份含 '+d.cases.length+' 筆案例,將覆蓋目前資料,確定?')) return;
+      cases=d.cases; save(); render(); go('dash'); toast('✓ 還原完成');
+    }catch(err){ toast('還原失敗:'+err.message); }
+  };
+  rd.readAsText(file);
+});
+function wipe(){
+  if(!confirm('清除全部案例紀錄?建議先備份!')) return;
+  if(!confirm('再確認一次:真的要全部清除嗎?')) return;
+  cases=[]; save(); render(); toast('已清空');
+}
+
+/* ============ 工具 ============ */
+function toast(m){
+  const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2200);
+}
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>

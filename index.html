@@ -489,9 +489,20 @@ async function loadCamList(){
     camList = await Html5Qrcode.getCameras();
     if(camList.length > 1){
       let saved = ''; try{ saved = localStorage.getItem('pos-cam-id')||''; }catch(e){}
+      const isFront = c => /front|user|前/i.test(c.label||'');
+      // 若之前誤選/誤存了前鏡頭 → 自動清除並改回後鏡頭重啟
+      const savedCam = camList.find(c => c.id === saved);
+      if(savedCam && isFront(savedCam)){
+        try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+        toast('偵測到前鏡頭,已自動切回後鏡頭');
+        await stopCam(); startCam(); return;
+      }
+      const backs = camList.filter(c => !isFront(c));
+      const fronts = camList.filter(isFront);
       const sel = document.getElementById('camSel');
-      sel.innerHTML = '<option value="" disabled '+(saved?'':'selected')+'>📷 掃不到/對不了焦?換顆鏡頭試試</option>' +
-        camList.map((c,i)=>`<option value="${c.id}" ${c.id===saved?'selected':''}>鏡頭 ${i+1}:${esc(c.label||('camera '+(i+1)))}</option>`).join('');
+      sel.innerHTML = '<option value="" disabled '+(saved?'':'selected')+'>📷 掃不到/對不了焦?換顆後鏡頭試試</option>' +
+        backs.map((c,i)=>`<option value="${c.id}" ${c.id===saved?'selected':''}>後鏡頭 ${i+1}:${esc(c.label||('camera '+(i+1)))}</option>`).join('') +
+        fronts.map(()=>`<option disabled>前鏡頭(自拍用,不能選)</option>`).join('');
       sel.classList.remove('hidden');
     }
   }catch(e){}

@@ -411,63 +411,70 @@ function showView(v){
 async function toggleCam(){ scanning ? stopCam() : startCam(); }
 let camZoomCaps = null, camZoom = 1, torchOn = false;
 async function startCam(){
-  try{
-    const cfg = { verbose: false,
-      experimentalFeatures: { useBarCodeDetectorIfSupported: true } }; // Android 原生條碼引擎,辨識力大增
-    if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
-      cfg.formatsToSupport = [ // 鎖定藥局常見格式,更快更準
-        Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
-        Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
-        Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.DATA_MATRIX,
-        Html5QrcodeSupportedFormats.QR_CODE ];
-    }
+  const cfg = { verbose: false,
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true } }; // Android 原生條碼引擎
+  if(typeof Html5QrcodeSupportedFormats !== 'undefined'){
+    cfg.formatsToSupport = [
+      Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_128, Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.UPC_A, Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF, Html5QrcodeSupportedFormats.DATA_MATRIX,
+      Html5QrcodeSupportedFormats.QR_CODE ];
+  }
+  const scanCfg = {
+    fps: 15,
+    qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}),
+    videoConstraints: {width:{ideal:1920}, height:{ideal:1080}}
+  };
+  // 徹底清掉上一台掃描器,確保乾淨起步
+  async function freshScanner(){
+    if(scanner){ try{ await scanner.stop(); }catch(e){} try{ scanner.clear(); }catch(e){} }
+    document.getElementById('scanBox').innerHTML = '';
     scanner = new Html5Qrcode('scanBox', cfg);
-    const scanCfg = {
-      fps: 15,
-      qrbox: (w,h)=>({width: Math.floor(w*0.9), height: Math.floor(Math.min(h*0.5, w*0.42))}), // 更大的掃描框
-      videoConstraints: {width:{ideal:1920}, height:{ideal:1080}} // 高解析度
-    };
-    // ── Z Fold5 專用鎖定流程 ──
-    // 1. 先點名所有鏡頭(三星命名:camera2 N, facing back/front)
-    try{ camList = await Html5Qrcode.getCameras(); }catch(e){ camList = []; }
-    const isFrontCam = c => /front|user|前/i.test(c.label||'');
-    const isBackCam  = c => /back|environment|後/i.test(c.label||'');
-    // 2. 建立候選佇列:Fold5 主鏡頭(camera2 0, back)最優先
-    const mainCam = camList.find(c => /camera2\s*0\b/i.test(c.label||'') && !isFrontCam(c));
-    const otherBacks = camList.filter(c => isBackCam(c) && !isFrontCam(c) && c !== mainCam);
-    const unknownCams = camList.filter(c => !isBackCam(c) && !isFrontCam(c) && c !== mainCam);
-    const queue = [];
-    try{ const saved = localStorage.getItem('pos-cam-id');
-         const sc = camList.find(c=>c.id===saved);
-         if(sc && !isFrontCam(sc)) queue.push({deviceId:{exact:saved}}); }catch(e){}
-    if(mainCam) queue.push({deviceId:{exact:mainCam.id}});
-    otherBacks.forEach(c => queue.push({deviceId:{exact:c.id}}));
-    queue.push({facingMode:{exact:'environment'}});
-    unknownCams.forEach(c => queue.push({deviceId:{exact:c.id}}));
-    queue.push({facingMode:'environment'});
-    // 3. 逐一啟動+驗貨:實際畫面是自拍方向就換下一顆
-    let started = false, lastErr = null;
-    for(const t of queue){
-      try{ await scanner.start(t, scanCfg, code=>onScan(code), ()=>{}); }
-      catch(err){ lastErr = err; continue; }
-      if(isRunningFront()){ // 掛羊頭賣狗肉,驗退!
-        if(t.deviceId){ try{ if(localStorage.getItem('pos-cam-id')===t.deviceId.exact) localStorage.removeItem('pos-cam-id'); }catch(e){} }
-        try{ await scanner.stop(); }catch(e){}
-        continue;
+  }
+  // 點名所有鏡頭(此步同時觸發權限請求)
+  try{ camList = await Html5Qrcode.getCameras(); }catch(e){ camList = []; }
+  const isFrontCam = c => /front|user|前/i.test(c.label||'');
+  const isBackCam  = c => /back|environment|後/i.test(c.label||'');
+  // 候選佇列:記住的 → Fold5 主鏡頭(camera2 0) → 其他後鏡頭 → 強制後置 → 一般後置 → 保底任意鏡頭
+  const mainCam = camList.find(c => /camera2\s*0\b/i.test(c.label||'') && !isFrontCam(c));
+  const otherBacks = camList.filter(c => isBackCam(c) && !isFrontCam(c) && c !== mainCam);
+  const queue = [];
+  try{ const saved = localStorage.getItem('pos-cam-id');
+       const sc = camList.find(c=>c.id===saved);
+       if(sc && !isFrontCam(sc)) queue.push({t:{deviceId:{exact:saved}}, verify:true}); }catch(e){}
+  if(mainCam) queue.push({t:{deviceId:{exact:mainCam.id}}, verify:true});
+  otherBacks.forEach(c => queue.push({t:{deviceId:{exact:c.id}}, verify:true}));
+  queue.push({t:{facingMode:{exact:'environment'}}, verify:false});
+  queue.push({t:{facingMode:'environment'}, verify:false});
+  if(camList.length) queue.push({t: camList[0].id, verify:false}); // 保底:至少讓相機開起來
+  let started = false, lastErr = null;
+  for(const cand of queue){
+    try{
+      await freshScanner();
+      await scanner.start(cand.t, scanCfg, code=>onScan(code), ()=>{});
+      if(cand.verify && isRunningFront()){ // 只驗退指定鏡頭;保底選項一律放行
+        if(cand.t.deviceId){ try{ if(localStorage.getItem('pos-cam-id')===cand.t.deviceId.exact) localStorage.removeItem('pos-cam-id'); }catch(e){} }
+        continue; // 下一輪 freshScanner() 會收拾這台
       }
       started = true; break;
-    }
-    if(!started) throw (lastErr || new Error('找不到可用的後鏡頭'));
-    scanning = true;
-    document.getElementById('btnCam').textContent='⏸ 暫停相機';
-    initCamCtrls();
-    renderCamList();
-  }catch(e){
-    document.getElementById('camHint').innerHTML =
-      '⚠️ 這個環境無法開啟相機(常見於 App 內嵌頁面)。<br>請改用下方手動輸入,或把本檔案放到支援相機的網頁環境。';
-    toast('相機無法啟動,請用手動輸入');
+    }catch(err){ lastErr = err; }
   }
+  if(!started){
+    let msg = '⚠️ 相機無法啟動。';
+    const n = lastErr && (lastErr.name || String(lastErr));
+    if(/NotAllowed|Permission/i.test(n||'')) msg += '<br>👉 相機權限被封鎖了:請點網址列左邊的 🔒 → 權限 → 相機 → 允許,然後重新整理。';
+    else if(/NotReadable|TrackStart|InUse/i.test(n||'')) msg += '<br>👉 鏡頭可能被其他 App 佔用:請關閉相機/視訊類 App,或重開機後再試。';
+    else if(/NotFound|Overconstrained/i.test(n||'')) msg += '<br>👉 找不到可用鏡頭:請關閉 App 完全重開一次。';
+    else msg += '<br>👉 請完全關閉 App 重開;若仍失敗,把此訊息回報:'+esc(String(n||'未知錯誤'));
+    document.getElementById('camHint').innerHTML = msg + '<br>期間可先用下方手動輸入(支援掃描槍)。';
+    toast('相機無法啟動,請看下方提示');
+    return;
+  }
+  scanning = true;
+  document.getElementById('btnCam').textContent='⏸ 暫停相機';
+  initCamCtrls();
+  renderCamList();
 }
 async function initCamCtrls(){
   camZoom = 1; torchOn = false; camZoomCaps = null;

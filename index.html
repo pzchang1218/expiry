@@ -211,7 +211,7 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
         </div>
         <div class="row2" style="margin-top:14px">
           <button class="btn-line" onclick="toggleNewProd()">取消</button>
-          <button class="btn-main" onclick="createProduct()">✓ 建立並登記效期</button>
+          <button id="npSubmit" class="btn-main" onclick="createProduct()">✓ 建立並登記效期</button>
         </div>
       </div>
     </div>
@@ -220,6 +220,7 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
       <div class="prod-card">
         <div class="name" id="pName"></div>
         <div class="meta" id="pMeta"></div>
+        <button class="btn-sm btn-line" style="margin-top:8px" onclick="editProduct()">✏️ 編輯此品項(改名/改條碼)</button>
       </div>
       <div id="doneBatches"></div>
 
@@ -841,7 +842,8 @@ async function createManual(){
   const name = document.getElementById('nfName').value.trim();
   openNewProd(code, name); // 導入完整建檔表單
 }
-/* ================= 新增品項 ================= */
+/* ================= 新增/編輯品項 ================= */
+let editingProdIdx = null; // null=新增模式,數字=編輯DB中該索引的品項
 function nextProdId(){
   let mx = 0;
   for(const p of DB){ const n = parseInt(p.id, 10); if(!isNaN(n) && n > mx) mx = n; }
@@ -852,18 +854,40 @@ function toggleNewProd(){
   const show = f.classList.contains('hidden');
   f.classList.toggle('hidden');
   if(show){
+    editingProdIdx = null;
+    document.getElementById('npSubmit').textContent = '✓ 建立並登記效期';
     document.getElementById('npName').value='';
     document.getElementById('npBc1').value='';
     document.getElementById('npBc2').value='';
     document.getElementById('npUnit').value='';
     document.getElementById('npId').value = nextProdId();
     document.getElementById('npName').focus();
+  }else{
+    editingProdIdx = null;
   }
+}
+function editProduct(){
+  if(!currentProd) return;
+  const idx = DB.indexOf(currentProd);
+  if(idx < 0){ toast('找不到此品項'); return; }
+  editingProdIdx = idx;
+  const f = document.getElementById('newProdForm');
+  f.classList.remove('hidden');
+  document.getElementById('npSubmit').textContent = '✓ 儲存修改';
+  document.getElementById('npName').value = currentProd.name;
+  document.getElementById('npBc1').value = currentProd.bc1;
+  document.getElementById('npBc2').value = currentProd.bc2;
+  document.getElementById('npUnit').value = currentProd.unit;
+  document.getElementById('npId').value = currentProd.id;
+  f.scrollIntoView({behavior:'smooth', block:'center'});
+  document.getElementById('npName').focus();
 }
 function openNewProd(bc, name){
   document.getElementById('notFoundCard').classList.add('hidden');
+  editingProdIdx = null;
   const f = document.getElementById('newProdForm');
   f.classList.remove('hidden');
+  document.getElementById('npSubmit').textContent = '✓ 建立並登記效期';
   document.getElementById('npName').value = name || '';
   document.getElementById('npBc1').value = bc || '';
   document.getElementById('npBc2').value = '';
@@ -878,14 +902,38 @@ async function createProduct(){
   const bc1 = document.getElementById('npBc1').value.trim();
   const bc2 = document.getElementById('npBc2').value.trim();
   let id = document.getElementById('npId').value.trim() || nextProdId();
-  // 防呆:編號或條碼撞號檢查
-  if(DB.some(p => p.id === id)){ toast('編號 '+id+' 已存在,請換一個'); return; }
+  // 防呆:編號或條碼撞號檢查(編輯模式排除自己)
+  if(DB.some((p,i) => p.id === id && i !== editingProdIdx)){ toast('編號 '+id+' 已存在,請換一個'); return; }
   for(const bc of [bc1, bc2]){
     if(!bc) continue;
-    const dup = DB.find(p => p.bc1===bc || p.bc2===bc);
-    if(dup && !confirm('條碼 '+bc+' 已屬於「'+dup.name+'」,確定仍要建立新品項?')) return;
+    const dup = DB.find((p,i) => (p.bc1===bc || p.bc2===bc) && i !== editingProdIdx);
+    if(dup && !confirm('條碼 '+bc+' 已屬於「'+dup.name+'」,確定仍要使用?')) return;
   }
-  DB.push({id, bc1, bc2, name, unit: document.getElementById('npUnit').value.trim(), stock: ''});
+  const unit = document.getElementById('npUnit').value.trim();
+  if(editingProdIdx !== null){
+    // ── 編輯模式:更新品項 + 同步該品項所有歷史記錄 ──
+    const p = DB[editingProdIdx];
+    const oldId = p.id;
+    p.id = id; p.bc1 = bc1; p.bc2 = bc2; p.name = name; p.unit = unit;
+    let recChanged = false;
+    for(const r of records){
+      if(r.pid === oldId){
+        r.pid = id; r.name = name; r.unit = unit; r.bc = bc1 || bc2 || r.bc;
+        recChanged = true;
+      }
+    }
+    loadDB(DB);
+    await sSet('pos-products', JSON.stringify(DB));
+    if(recChanged) await sSet('pos-records', JSON.stringify(records));
+    document.getElementById('newProdForm').classList.add('hidden');
+    const idx = editingProdIdx; editingProdIdx = null;
+    refreshAll();
+    toast('✓ 品項已更新:'+name.slice(0,12));
+    openForm(idx); // 重新載入更新後的商品卡
+    return;
+  }
+  // ── 新增模式 ──
+  DB.push({id, bc1, bc2, name, unit, stock: ''});
   loadDB(DB);
   await sSet('pos-products', JSON.stringify(DB));
   document.getElementById('newProdForm').classList.add('hidden');

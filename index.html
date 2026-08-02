@@ -175,11 +175,12 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
     <div class="card">
       <h2>📷 掃描條碼</h2>
       <div id="scanBox"></div>
-      <div id="camCtrls" class="hidden" style="display:flex;gap:8px;margin-top:8px;align-items:center;justify-content:center;">
+      <div id="camCtrls" class="hidden" style="display:flex;gap:8px;margin-top:8px;align-items:center;justify-content:center;flex-wrap:wrap;">
         <button class="btn-sm btn-line" id="btnTorch" onclick="toggleTorch()">🔦 手電筒</button>
         <button class="btn-sm btn-line" onclick="nudgeZoom(-1)">➖</button>
         <span id="zoomLbl" class="muted" style="min-width:44px;text-align:center;">1.0x</span>
         <button class="btn-sm btn-line" onclick="nudgeZoom(1)">➕ 放大</button>
+        <button class="btn-sm btn-danger" onclick="reportFrontCam()">🙅 這是自拍鏡</button>
       </div>
       <select id="camSel" class="hidden" style="margin-top:8px;" onchange="switchCam(this.value)"></select>
       <button id="btnCam" class="btn-main" style="margin-top:10px" onclick="toggleCam()">開啟相機掃描</button>
@@ -436,26 +437,32 @@ async function startCam(){
   try{ camList = await Html5Qrcode.getCameras(); }catch(e){ camList = []; }
   const isFrontCam = c => /front|user|前/i.test(c.label||'');
   const isBackCam  = c => /back|environment|後/i.test(c.label||'');
-  // 候選佇列:記住的 → Fold5 主鏡頭(camera2 0) → 其他後鏡頭 → 強制後置 → 一般後置 → 保底任意鏡頭
-  const mainCam = camList.find(c => /camera2\s*0\b/i.test(c.label||'') && !isFrontCam(c));
-  const otherBacks = camList.filter(c => isBackCam(c) && !isFrontCam(c) && c !== mainCam);
+  const banned = id => camBlacklist.includes(id);
+  // 候選佇列:強制後置(OS層級最可靠)→ 記住的 → Fold5主鏡頭 → 其他後鏡頭 → 一般後置 → 保底
+  const mainCam = camList.find(c => /camera2\s*0\b/i.test(c.label||'') && !isFrontCam(c) && !banned(c.id));
+  const otherBacks = camList.filter(c => isBackCam(c) && !isFrontCam(c) && c !== mainCam && !banned(c.id));
   const queue = [];
+  queue.push({t:{facingMode:{exact:'environment'}}, verify:true});
   try{ const saved = localStorage.getItem('pos-cam-id');
        const sc = camList.find(c=>c.id===saved);
-       if(sc && !isFrontCam(sc)) queue.push({t:{deviceId:{exact:saved}}, verify:true}); }catch(e){}
+       if(sc && !isFrontCam(sc) && !banned(saved)) queue.unshift({t:{deviceId:{exact:saved}}, verify:true}); }catch(e){}
   if(mainCam) queue.push({t:{deviceId:{exact:mainCam.id}}, verify:true});
   otherBacks.forEach(c => queue.push({t:{deviceId:{exact:c.id}}, verify:true}));
-  queue.push({t:{facingMode:{exact:'environment'}}, verify:false});
-  queue.push({t:{facingMode:'environment'}, verify:false});
-  if(camList.length) queue.push({t: camList[0].id, verify:false}); // 保底:至少讓相機開起來
+  queue.push({t:{facingMode:'environment'}, verify:true});
+  const anyOk = camList.find(c=>!banned(c.id));
+  if(anyOk) queue.push({t: anyOk.id, verify:false}); // 保底:至少讓相機開起來
   let started = false, lastErr = null;
   for(const cand of queue){
     try{
       await freshScanner();
       await scanner.start(cand.t, scanCfg, code=>onScan(code), ()=>{});
-      if(cand.verify && isRunningFront()){ // 只驗退指定鏡頭;保底選項一律放行
+      // 啟動後查驗:在黑名單裡(您親自認證過的自拍鏡)→ 直接換下一顆
+      let runId = '';
+      try{ const st = scanner.getRunningTrackSettings(); runId = (st && st.deviceId) || ''; }catch(e){}
+      if(cand.verify && runId && banned(runId)){ continue; }
+      if(cand.verify && isRunningFront()){
         if(cand.t.deviceId){ try{ if(localStorage.getItem('pos-cam-id')===cand.t.deviceId.exact) localStorage.removeItem('pos-cam-id'); }catch(e){} }
-        continue; // 下一輪 freshScanner() 會收拾這台
+        continue;
       }
       started = true; break;
     }catch(err){ lastErr = err; }
@@ -512,6 +519,19 @@ async function toggleTorch(){
   }catch(e){ torchOn = false; toast('這台裝置不支援手電筒'); }
 }
 let camList = [];
+let camBlacklist = [];
+try{ camBlacklist = JSON.parse(localStorage.getItem('pos-cam-blacklist')||'[]'); }catch(e){ camBlacklist = []; }
+function saveBlacklist(){ try{ localStorage.setItem('pos-cam-blacklist', JSON.stringify(camBlacklist)); }catch(e){} }
+async function reportFrontCam(){
+  // 使用者親自認證:目前這顆是自拍鏡 → 永久拉黑,自動換下一顆
+  let runId = '';
+  try{ const st = scanner.getRunningTrackSettings(); runId = (st && st.deviceId) || ''; }catch(e){}
+  if(runId && !camBlacklist.includes(runId)){ camBlacklist.push(runId); saveBlacklist(); }
+  try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+  toast('已拉黑這顆自拍鏡,換下一顆…');
+  await stopCam();
+  startCam();
+}
 function isRunningFront(){
   // 用「實際運作中」的鏡頭判斷方向,不信名牌
   try{
@@ -536,16 +556,25 @@ function renderCamList(){
       const sel = document.getElementById('camSel');
       sel.innerHTML = '<option value="" disabled '+((saved||activeId)?'':'selected')+'>📷 掃不到/對不了焦?換顆後鏡頭試試</option>' +
         backs.map((c,i)=>{
+          if(camBlacklist.includes(c.id)) return `<option disabled>🚫 後鏡頭 ${i+1}(已認證是自拍鏡)</option>`;
           const mark = c.id===activeId ? '✅ 使用中|' : '';
           return `<option value="${c.id}" ${c.id===(saved||activeId)?'selected':''}>${mark}後鏡頭 ${i+1}:${esc(c.label||('camera '+(i+1)))}</option>`;
         }).join('') +
-        fronts.map(()=>`<option disabled>前鏡頭(自拍用,不能選)</option>`).join('');
+        fronts.map(()=>`<option disabled>前鏡頭(自拍用,不能選)</option>`).join('') +
+        (camBlacklist.length ? '<option value="__reset">🔄 重設鏡頭記錄(解除拉黑重來)</option>' : '');
       sel.classList.remove('hidden');
     }
   }catch(e){}
 }
 async function switchCam(id){
   if(!id) return;
+  if(id === '__reset'){
+    camBlacklist = []; saveBlacklist();
+    try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+    toast('已重設鏡頭記錄');
+    await stopCam(); startCam();
+    return;
+  }
   try{ localStorage.setItem('pos-cam-id', id); }catch(e){}
   await stopCam();
   startCam();

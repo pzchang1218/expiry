@@ -188,7 +188,17 @@ body.dark .seg{background:#0b100f;}
 
   <!-- ============ 掃描登記 ============ -->
   <section id="viewScan" class="hidden">
+    <div class="card" id="todayCard" style="background:linear-gradient(140deg,#0b6b55,#0f8a6d);color:#fff;border:none;">
+      <h2 style="color:rgba(255,255,255,.75)">🔔 今 日 待 辦</h2>
+      <div id="todayBox"></div>
+    </div>
     <div id="envWarn" class="hidden" style="background:#fdecea;border:2px solid #b3261e;border-radius:14px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.7;color:#7a1a14;"></div>
+    <div class="card" style="padding:10px 14px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="muted" style="white-space:nowrap">👤 目前操作者</span>
+        <select id="opSel" onchange="setOperator(this.value)" style="flex:1"></select>
+      </div>
+    </div>
     <div class="card">
       <h2>📷 掃描條碼</h2>
       <div id="scanBox"></div>
@@ -243,6 +253,7 @@ body.dark .seg{background:#0b100f;}
         <div class="meta" id="pMeta"></div>
         <button class="btn-sm btn-line" style="margin-top:8px" onclick="editProduct()">✏️ 編輯此品項(改名/改條碼)</button>
       </div>
+      <div id="simWarn" class="hidden" style="background:var(--amber-lt);border:2px solid var(--amber);color:var(--amber);border-radius:12px;padding:10px;margin-bottom:10px;font-size:13px;line-height:1.7"></div>
       <div id="doneBatches"></div>
 
       <label>批號</label>
@@ -309,7 +320,8 @@ body.dark .seg{background:#0b100f;}
     </div>
     <div class="card" id="recList"></div>
     <div class="card">
-      <button class="btn-main" onclick="exportXlsx()">⬇️ 匯出盤點結果 Excel</button>
+      <button class="btn-main" onclick="exportMonthly()">📊 產生本月月報 Excel</button>
+      <button class="btn-main" style="margin-top:10px" onclick="exportXlsx()">⬇️ 匯出盤點結果 Excel</button>
       <button class="btn-ghost" style="margin-top:10px" onclick="reUpload()">🔄 更新商品主檔</button>
       <div class="row2" style="margin-top:10px">
         <button class="btn-ghost" onclick="backupData()">💾 備份資料</button>
@@ -335,6 +347,29 @@ body.dark .seg{background:#0b100f;}
   </section>
 
 </main>
+
+<div id="doneModal" class="hidden" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--card);border-radius:16px;padding:18px;max-width:360px;width:100%;">
+    <h2 style="margin:0 0 4px;font-size:16px;">結案處理</h2>
+    <p class="muted" id="dmName" style="margin:0 0 10px"></p>
+    <label>處理方式</label>
+    <select id="dmWay">
+      <option value="expired">❌ 過期銷毀(計入損失)</option>
+      <option value="sold">✅ 已售出/用完</option>
+      <option value="return">↩️ 退貨廠商</option>
+      <option value="other">其他</option>
+    </select>
+    <div class="row2">
+      <div><label>數量</label><input id="dmQty" type="number" inputmode="numeric"></div>
+      <div><label>單價(選填)</label><input id="dmPrice" type="number" inputmode="decimal" placeholder="每單位成本"></div>
+    </div>
+    <p class="muted" id="dmCalc" style="margin:8px 0 0"></p>
+    <div class="row2" style="margin-top:14px">
+      <button class="btn-line" style="padding:12px" onclick="closeDoneModal()">取消</button>
+      <button class="btn-main" style="padding:12px" onclick="confirmDone()">✓ 確認結案</button>
+    </div>
+  </div>
+</div>
 
 <nav class="tabs" id="tabs" style="display:none">
   <button id="tabScan" class="active" onclick="showView('scan')"><span class="ico">📷</span>掃描登記</button>
@@ -487,6 +522,8 @@ function enterApp(){
   document.getElementById('tabs').style.display='flex';
   showView('scan');
   refreshAll();
+  loadOperators();
+  renderToday();
   checkEnv(); // 檢查瀏覽器環境,揪出三星瀏覽器
   try{ // 備份提醒:超過14天未備份
     const lb = parseInt(localStorage.getItem('pos-last-backup')||'0',10)||0;
@@ -504,6 +541,7 @@ function showView(v){
   document.getElementById('tabScan').classList.toggle('active', v==='scan');
   document.getElementById('tabRec').classList.toggle('active', v==='records');
   document.getElementById('tabAlert').classList.toggle('active', v==='alert');
+  if(v==='scan'){ renderToday(); }
   if(v==='records'){ renderRecords(); stopCam(); }
   if(v==='alert'){ renderAlert(); stopCam(); }
 }
@@ -885,6 +923,7 @@ function openForm(i){
     pendingGS1 = null;
   }
   renderDoneBatches();
+  showSimilarWarn(currentProd);
   document.getElementById('formCard').classList.remove('hidden');
   document.getElementById('formCard').scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -997,7 +1036,8 @@ async function saveRecord(){
     bc: currentProd.bc1||currentProd.bc2||'',
     batch: document.getElementById('fBatch').value.trim(),
     expiry, qty,
-    ts: new Date().toLocaleString('zh-TW',{hour12:false})
+    ts: new Date().toLocaleString('zh-TW',{hour12:false}),
+    by: currentOp
   });
   await sSet('pos-records', JSON.stringify(records));
   toast(`✓ 已存:${currentProd.name.slice(0,12)}`);
@@ -1005,7 +1045,7 @@ async function saveRecord(){
   document.getElementById('fBatch').value='';
   clearExpiry();
   document.getElementById('fQty').value='';
-  refreshAll();
+  refreshAll(); renderToday();
   lastEntry = {batch: records[records.length-1].batch, expiry: records[records.length-1].expiry};
   if(document.getElementById('rapidMode').checked){ closeForm(); } // ⚡ 連掃:直接準備下一件
   qInput.value=''; qInput.focus(); // 準備掃下一件
@@ -1143,16 +1183,23 @@ function renderDashboard(){
   const itemSet = new Set(records.map(r=>r.pid));
   const withBatch = records.filter(r=>r.batch).length;
   const now = new Date();
-  const doneThisMonth = records.filter(r=>{
+  const isThisMonth = r=>{
     if(!r.doneTs) return false;
     const p = String(r.doneTs).split('/');
     return +p[0]===now.getFullYear() && +p[1]===(now.getMonth()+1);
-  }).length;
+  };
+  const doneThisMonth = records.filter(isThisMonth).length;
+  const monthLoss = records.filter(isThisMonth).reduce((s,r)=>s+(r.loss||0),0);
+  const totalLoss = records.reduce((s,r)=>s+(r.loss||0),0);
   document.getElementById('dashBox').innerHTML = `
     <div class="stat-row" style="margin-top:10px">
       <div class="stat"><div class="num">${Math.round(itemSet.size/Math.max(DB.length,1)*100)}%</div><div class="lbl">盤點進度</div></div>
       <div class="stat"><div class="num">${records.length?Math.round(withBatch/records.length*100):0}%</div><div class="lbl">批號完成率</div></div>
       <div class="stat"><div class="num">${doneThisMonth}</div><div class="lbl">本月結案</div></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="num" style="color:#b3261e">${monthLoss.toLocaleString()}</div><div class="lbl">本月過期損失(元)</div></div>
+      <div class="stat"><div class="num" style="color:#b26a00">${totalLoss.toLocaleString()}</div><div class="lbl">累計損失(元)</div></div>
     </div>
     <div class="stat-row" style="margin-bottom:0">
       <div class="stat"><div class="num" style="color:#b3261e">${a.past.length}</div><div class="lbl">已過期</div></div>
@@ -1331,7 +1378,10 @@ function exportXlsx(){
   const detail = records.map(r=>({
     '編號':r.pid,'條碼':r.bc,'名稱':r.name,'單位':r.unit,
     '批號':r.batch,'效期':r.expiry,'數量':r.qty,'登記時間':r.ts,
-    '處理狀態':r.done?('已處理 '+(r.doneTs||'')):''
+    '登記人':r.by||'',
+    '處理狀態':r.done?('已處理 '+(r.doneTs||'')):'',
+    '處理方式':({expired:'過期銷毀',sold:'已售出/用完',return:'退貨廠商',other:'其他'})[r.doneWay]||'',
+    '損失金額':r.loss||''
   }));
   const groups = {};
   for(const r of records){
@@ -1347,6 +1397,153 @@ function exportXlsx(){
   const d = new Date();
   const fn = `盤點結果_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`;
   saveWorkbook(wb, fn);
+}
+
+/* ================= 月報 ================= */
+function monthlyStats(ym){
+  const inMonth = s => String(s||'').replace(/-/g,'/').startsWith(ym.replace('-','/'));
+  const doneThis = records.filter(r=>r.done && inMonth(r.doneTs));
+  const scanThis = records.filter(r=>inMonth(r.ts));
+  const loss = doneThis.reduce((s,r)=>s+(r.loss||0),0);
+  const expiredCnt = doneThis.filter(r=>r.doneWay==='expired').length;
+  const itemSet = new Set(records.filter(r=>!r.done).map(r=>r.pid));
+  const a = buildAlerts();
+  return {ym, doneThis, scanThis, loss, expiredCnt,
+    rate: Math.round(itemSet.size/Math.max(DB.length,1)*100),
+    pending: a.total, past: a.past.length, low: lowStockList().length};
+}
+function exportMonthly(){
+  const d = new Date();
+  const ym = d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0');
+  const s = monthlyStats(ym);
+  const wb = XLSX.utils.book_new();
+  // 總覽
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+    {'項目':'報告月份','數值':ym},
+    {'項目':'商品總品項','數值':DB.length},
+    {'項目':'盤點涵蓋率(%)','數值':s.rate},
+    {'項目':'本月新登記批次','數值':s.scanThis.length},
+    {'項目':'本月結案筆數','數值':s.doneThis.length},
+    {'項目':'其中過期銷毀筆數','數值':s.expiredCnt},
+    {'項目':'本月過期損失金額(元)','數值':s.loss},
+    {'項目':'目前待處理警示','數值':s.pending},
+    {'項目':'目前已過期未處理','數值':s.past},
+    {'項目':'庫存偏低品項','數值':s.low}
+  ]), '月報總覽');
+  // 損失明細
+  const wayMap = {expired:'過期銷毀', sold:'已售出/用完', return:'退貨廠商', other:'其他'};
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    s.doneThis.length ? s.doneThis.map(r=>({
+      '結案日期':r.doneTs,'名稱':r.name,'批號':r.batch,'效期':r.expiry,
+      '處理方式':wayMap[r.doneWay]||'—','數量':r.doneQty??r.qty,
+      '單價':r.price||'','損失金額':r.loss||0,'處理人':r.doneBy||''
+    })) : [{'結案日期':'本月無結案紀錄'}]), '結案明細');
+  // 操作者統計
+  const byOp = {};
+  for(const r of s.scanThis){ const k=r.by||'未註明'; byOp[k]=(byOp[k]||0)+1; }
+  for(const r of s.doneThis){ const k=r.doneBy||'未註明'; byOp[k]=byOp[k]||0; }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    Object.keys(byOp).length ? Object.entries(byOp).map(([k,v])=>({'操作者':k,'本月登記批次':v}))
+      : [{'操作者':'無資料'}]), '操作者統計');
+  // 待處理清單
+  const a = buildAlerts();
+  const pend = [...a.past, ...a.m1, ...a.m3].map(r=>({
+    '名稱':r.name,'批號':r.batch,'效期':r.expiry,'剩餘天數':r.days,'數量':r.qty}));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    pend.length?pend:[{'名稱':'目前無待處理項目'}]), '待處理清單');
+  saveWorkbook(wb, `藥局月報_${ym.replace('/','')}.xlsx`);
+}
+
+/* ================= 相似品名提醒 ================= */
+function nameCore(s){
+  // 取品名主體:去掉括號內容、劑量、包裝單位等,保留核心中文/英文名
+  return String(s||'')
+    .replace(/[（(].*?[)）]/g,' ')
+    .replace(/\d+(\.\d+)?\s*(MG|ML|G|MCG|IU|%|T|CC|入|粒|錠|包|盒|瓶|支|片|條|抽|S)\b/gi,' ')
+    .replace(/[\d\*\/\-\+]/g,' ')
+    .replace(/\s+/g,'').trim();
+}
+function findSimilar(prod){
+  const core = nameCore(prod.name);
+  if(core.length < 2) return [];
+  return DB.filter(p => p !== prod && p.id !== prod.id && nameCore(p.name) === core);
+}
+function showSimilarWarn(prod){
+  const box = document.getElementById('simWarn');
+  if(!box) return;
+  const sim = findSimilar(prod);
+  if(!sim.length){ box.classList.add('hidden'); box.innerHTML=''; return; }
+  box.innerHTML = '💡 <b>系統裡有 '+sim.length+' 個相似品項</b>(同名不同劑量/廠牌/規格)<br>'
+    + sim.slice(0,4).map(p=>'· '+esc(p.name)).join('<br>')
+    + (sim.length>4 ? '<br>· …等 '+(sim.length-4)+' 項' : '')
+    + '<br><span style="font-size:12px">請確認手上這盒是上方選定的品項 👆</span>';
+  box.classList.remove('hidden');
+}
+
+/* ================= 操作者(多人使用) ================= */
+let operators = [], currentOp = '';
+function loadOperators(){
+  try{ operators = JSON.parse(localStorage.getItem('pos-operators')||'[]'); }catch(e){ operators=[]; }
+  if(!operators.length) operators = ['藥師'];
+  try{ currentOp = localStorage.getItem('pos-current-op')||operators[0]; }catch(e){ currentOp = operators[0]; }
+  if(!operators.includes(currentOp)) currentOp = operators[0];
+  renderOperators();
+}
+function renderOperators(){
+  const sel = document.getElementById('opSel');
+  if(!sel) return;
+  sel.innerHTML = operators.map(o=>`<option ${o===currentOp?'selected':''}>${esc(o)}</option>`).join('')
+    + '<option value="__add">➕ 新增操作者…</option>'
+    + (operators.length>1 ? '<option value="__del">🗑 移除目前操作者</option>' : '');
+}
+function setOperator(v){
+  if(v==='__add'){
+    const n = prompt('新增操作者名稱(例:小美、王藥師)');
+    if(n && n.trim() && !operators.includes(n.trim())){
+      operators.push(n.trim()); currentOp = n.trim();
+      try{ localStorage.setItem('pos-operators', JSON.stringify(operators)); }catch(e){}
+      toast('已新增操作者:'+currentOp);
+    }
+  }else if(v==='__del'){
+    if(operators.length<=1){ toast('至少要保留一位'); }
+    else if(confirm('移除操作者「'+currentOp+'」?(已登記的記錄不受影響)')){
+      operators = operators.filter(o=>o!==currentOp);
+      currentOp = operators[0];
+      try{ localStorage.setItem('pos-operators', JSON.stringify(operators)); }catch(e){}
+    }
+  }else{ currentOp = v; }
+  try{ localStorage.setItem('pos-current-op', currentOp); }catch(e){}
+  renderOperators();
+}
+
+/* ================= 今日待辦 ================= */
+function renderToday(){
+  const box = document.getElementById('todayBox');
+  if(!box) return;
+  const a = buildAlerts();
+  const now = new Date(); now.setHours(0,0,0,0);
+  const today = records.filter(r=>{ if(r.done) return false;
+    const d = expDate(r.expiry); return d && Math.round((d-now)/86400000)===0; }).length;
+  const low = lowStockList().length;
+  const items = [];
+  if(a.past.length) items.push(`<b style="font-size:18px">${a.past.length}</b> 件已過期待處理`);
+  if(today) items.push(`<b style="font-size:18px">${today}</b> 件今天到期`);
+  if(a.m1.length) items.push(`<b style="font-size:18px">${a.m1.length}</b> 件一個月內到期`);
+  if(low) items.push(`<b style="font-size:18px">${low}</b> 件庫存偏低`);
+  box.innerHTML = items.length
+    ? '<div style="line-height:2">' + items.map(t=>'· '+t).join('<br>') + '</div>'
+      + `<button class="btn-sm" style="margin-top:10px;background:rgba(255,255,255,.22);color:#fff" onclick="showView('alert')">前往處理 →</button>`
+    : '<p style="margin:0;line-height:1.8">今天沒有待辦事項,一切都在掌握中 ✨<br><span style="opacity:.75;font-size:13px">繼續保持!</span></p>';
+}
+function lowStockList(){
+  // 帳面庫存 <= 門檻(預設3)且未盤到者視為庫存偏低
+  let th = 3; try{ th = parseInt(localStorage.getItem('pos-low-th')||'3',10)||3; }catch(e){}
+  const counted = {};
+  for(const r of records){ if(!r.done) counted[r.pid] = (counted[r.pid]||0) + (Number(r.qty)||0); }
+  return DB.filter(p=>{
+    const q = (p.id in counted) ? counted[p.id] : (p.stock===''?null:Number(p.stock));
+    return q!==null && !isNaN(q) && q>0 && q<=th;
+  });
 }
 
 /* ================= 效期警示 ================= */
@@ -1435,14 +1632,51 @@ function renderAlert(){
   }
   list.innerHTML = html;
 }
-async function markDone(rid){
+let doneTarget = null;
+function markDone(rid){
   const r = records.find(x=>x.rid===rid);
   if(!r) return;
+  doneTarget = rid;
+  document.getElementById('dmName').textContent = r.name + '｜效期 ' + r.expiry;
+  document.getElementById('dmWay').value = 'expired';
+  document.getElementById('dmQty').value = r.qty || 0;
+  document.getElementById('dmPrice').value = r.price || '';
+  document.getElementById('doneModal').classList.remove('hidden');
+  updateDmCalc();
+}
+function updateDmCalc(){
+  const q = +document.getElementById('dmQty').value || 0;
+  const p = +document.getElementById('dmPrice').value || 0;
+  const way = document.getElementById('dmWay').value;
+  document.getElementById('dmCalc').textContent =
+    (way==='expired' && q && p) ? `本筆損失金額:${(q*p).toLocaleString()} 元` :
+    (way==='expired' ? '填入單價可統計損失金額' : '此處理方式不計入損失');
+}
+['dmQty','dmPrice','dmWay'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updateDmCalc), el.addEventListener('change', updateDmCalc);
+});
+function closeDoneModal(){
+  document.getElementById('doneModal').classList.add('hidden');
+  doneTarget = null;
+}
+async function confirmDone(){
+  const r = records.find(x=>x.rid===doneTarget);
+  if(!r){ closeDoneModal(); return; }
+  const way = document.getElementById('dmWay').value;
+  const q = +document.getElementById('dmQty').value || 0;
+  const p = +document.getElementById('dmPrice').value || 0;
   r.done = true;
   r.doneTs = new Date().toLocaleString('zh-TW',{hour12:false});
+  r.doneWay = way;
+  r.doneQty = q;
+  r.price = p || r.price || 0;
+  r.loss = (way==='expired') ? Math.round(q * (p || r.price || 0)) : 0;
+  r.doneBy = currentOp;
   await sSet('pos-records', JSON.stringify(records));
-  renderAlert();
-  toast('✓ 已結案:'+r.name.slice(0,12));
+  closeDoneModal();
+  renderAlert(); renderToday();
+  toast(r.loss ? `✓ 已結案(損失 ${r.loss.toLocaleString()} 元)` : '✓ 已結案:'+r.name.slice(0,12));
 }
 async function undoDone(rid){
   const r = records.find(x=>x.rid===rid);

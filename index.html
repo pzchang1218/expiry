@@ -154,6 +154,19 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
   .btn-main, .btn-ghost{ font-size:15px; padding:12px; }
 }
 
+
+/* ===== iOS / Safari 相容性 ===== */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+/* iOS 聚焦字級 <16px 的輸入框時會自動放大整頁,一律 ≥16px */
+input, select, textarea{ font-size:16px !important; }
+/* iOS 下拉選單外觀一致化 */
+select{ -webkit-appearance:none; appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; background-size:11px;
+  padding-right:34px; }
+/* iOS 慣性捲動 */
+body{ -webkit-overflow-scrolling:touch; }
+
 /* 🌙 深色模式 */
 body.dark{
   --ink:#e6efec; --ink2:#9db3ad; --bg:#0f1614; --card:#1a2422;
@@ -662,6 +675,7 @@ function checkEnv(){
     w.classList.remove('hidden');
   }else{
     w.classList.add('hidden');
+    iosNotice();
   }
 }
 function showCamDiag(){
@@ -1563,6 +1577,30 @@ function exportMonthly(){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
     pend.length?pend:[{'名稱':'目前無待處理項目'}]), '待處理清單');
   saveWorkbook(wb, `藥局月報_${ym.replace('/','')}.xlsx`);
+}
+
+/* ================= iOS 使用提示 ================= */
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+function iosNotice(){
+  if(!isIOS()) return;
+  const w = document.getElementById('envWarn');
+  if(!w) return;
+  let msg = '';
+  if(!isStandalone()){
+    msg += '📱 <b>iPhone 使用建議</b><br>請用 <b>Safari</b> 開啟,點下方「分享 ⬆️」→「加入主畫面」,'
+        + '之後從桌面圖示開啟,相機才能正常運作。<br>';
+  }
+  msg += '💾 <b>重要</b>:iPhone 若超過 7 天沒開啟本工具,系統可能自動清除資料。'
+      + '請養成<b>每週開一次 + 定期備份</b>的習慣。';
+  w.innerHTML = msg;
+  w.style.background = '#eef4ff'; w.style.borderColor = '#2d5fa8'; w.style.color = '#1b3a68';
+  w.classList.remove('hidden');
 }
 
 /* ================= 低庫存 / 叫貨清單 ================= */

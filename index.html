@@ -404,6 +404,7 @@ body.dark .seg{background:#0b100f;}
     <div class="card" id="recList"></div>
     <div class="card">
       <button class="btn-main" onclick="exportMonthly()">📊 產生本月月報 Excel</button>
+      <button class="btn-main" style="margin-top:10px;background:#7a4b8a" onclick="exportDestroy()">📄 產生銷燬紀錄表</button>
       <button class="btn-main" style="margin-top:10px" onclick="exportXlsx()">⬇️ 匯出盤點結果 Excel</button>
       <button class="btn-ghost" style="margin-top:10px" onclick="reUpload()">🔄 更新商品主檔</button>
       <div class="row2" style="margin-top:10px">
@@ -469,6 +470,40 @@ body.dark .seg{background:#0b100f;}
 
   <!-- ============ 分析(風險預警 / 分區盤點 / 毛利) ============ -->
   <section id="viewPro" class="hidden">
+    <div class="card" style="border:2px solid #b3261e">
+      <h2 style="color:#b3261e">🚨 藥品回收批號比對</h2>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">收到公會/食藥署回收公文時,貼上品名與批號,立刻查出店裡有沒有這批貨</p>
+      <label>藥品名稱(可只打關鍵字)</label>
+      <input id="rcName" placeholder="例:保你爾 或 保你爾膜衣錠8毫克" autocomplete="off">
+      <label>回收批號(多個批號用空格或逗號分隔)</label>
+      <input id="rcBatch" placeholder="例:2KA31 2KA32" autocomplete="off">
+      <div class="row2" style="margin-top:12px">
+        <button class="btn-line" style="padding:12px" onclick="clearRecall()">清空</button>
+        <button class="btn-main" style="padding:12px;background:#b3261e" onclick="checkRecall()">🔍 立即比對</button>
+      </div>
+      <div id="rcResult"></div>
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📋 回收處理紀錄(<span id="rcLogCount">0</span>)</summary>
+        <div id="rcLog"></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>🧊 冷藏溫度紀錄</h2>
+      <div class="row2">
+        <div><label>今日溫度(°C)</label><input id="tmpVal" type="number" step="0.1" inputmode="decimal" placeholder="例:5.0"></div>
+        <div><label>量測時段</label><select id="tmpSlot"><option>早班</option><option>午班</option><option>晚班</option></select></div>
+      </div>
+      <div class="row2">
+        <div><label>合格下限</label><input id="tmpMin" type="number" step="0.1" onchange="saveTempRange()"></div>
+        <div><label>合格上限</label><input id="tmpMax" type="number" step="0.1" onchange="saveTempRange()"></div>
+      </div>
+      <button class="btn-main" style="margin-top:12px" onclick="addTemp()">✓ 登記溫度</button>
+      <div id="tmpToday"></div>
+      <div id="tmpList"></div>
+      <button class="btn-ghost" style="margin-top:10px" onclick="exportTemp()">⬇️ 匯出溫度紀錄表</button>
+    </div>
+
     <div class="card">
       <h2>🔮 過期風險預警</h2>
       <p class="muted" style="margin:0 0 8px;font-size:13px">依商品的歷史消耗速度,推估效期內是否賣得完</p>
@@ -1672,6 +1707,216 @@ function iosNotice(){
   w.classList.remove('hidden');
 }
 
+/* ================= 藥品回收批號比對 ================= */
+let recallLog = [];
+try{ recallLog = JSON.parse(localStorage.getItem('pos-recall-log')||'[]'); }catch(e){ recallLog=[]; }
+function normBatch(s){ return String(s||'').toUpperCase().replace(/[\s\-_.]/g,''); }
+function clearRecall(){
+  document.getElementById('rcName').value='';
+  document.getElementById('rcBatch').value='';
+  document.getElementById('rcResult').innerHTML='';
+}
+function checkRecall(){
+  const name = document.getElementById('rcName').value.trim();
+  const raw  = document.getElementById('rcBatch').value.trim();
+  const box  = document.getElementById('rcResult');
+  if(!name && !raw){ toast('請至少輸入品名或批號'); return; }
+  const batches = raw.split(/[\s,、;，]+/).filter(Boolean).map(normBatch);
+  const terms = name.toLowerCase().split(/\s+/).filter(Boolean);
+  // 比對:品名關鍵字全中 且(若有指定批號)批號相符
+  const hits = records.filter(r=>{
+    const nameOk = !terms.length || terms.every(t=>String(r.name||'').toLowerCase().includes(t));
+    if(!nameOk) return false;
+    if(!batches.length) return true;
+    const rb = normBatch(r.batch);
+    return rb && batches.some(b => rb===b || rb.includes(b) || b.includes(rb));
+  });
+  // 品名有中但批號沒填的批次 → 需人工確認
+  const noBatch = batches.length ? records.filter(r=>{
+    const nameOk = terms.length && terms.every(t=>String(r.name||'').toLowerCase().includes(t));
+    return nameOk && !normBatch(r.batch) && !hits.includes(r);
+  }) : [];
+  const total = hits.reduce((s,r)=>s+(Number(r.qty)||0),0);
+  let html = '';
+  if(hits.length){
+    html += `<div class="alert-item al-past" style="margin-top:12px">
+      <div class="nm" style="font-size:17px">⚠️ 命中 ${hits.length} 批,共 ${total} 件 — 請立即下架!</div>
+      ${hits.map(r=>{
+        const p = DB.find(x=>x.id===r.pid)||{};
+        return `<div class="dt" style="margin-top:6px">• <b>${esc(r.name)}</b><br>
+          批號 <b>${esc(r.batch||'未填')}</b>｜效期 ${esc(r.expiry)}｜${r.qty} ${esc(r.unit||'')}
+          ${p.shelf?`｜📍 <b>${esc(p.shelf)}</b>`:''}${r.done?'(已結案)':''}</div>`;
+      }).join('')}
+      <button class="btn-sm btn-line" style="margin-top:10px" onclick="logRecall()">📝 記錄此次回收處理</button>
+    </div>`;
+  }else{
+    html += `<div class="alert-item al-m6" style="margin-top:12px">
+      <div class="nm">✅ 沒有符合的批次 — 店內沒有這批回收品</div>
+      <div class="dt">已比對 ${records.length} 筆盤點記錄</div>
+      <button class="btn-sm btn-line" style="margin-top:8px" onclick="logRecall()">📝 記錄此次已查核</button></div>`;
+  }
+  if(noBatch.length){
+    html += `<div class="alert-item al-m1" style="margin-top:10px">
+      <div class="nm">🔎 有 ${noBatch.length} 批同品名但<b>批號未登記</b>,需人工確認</div>
+      ${noBatch.slice(0,10).map(r=>{
+        const p = DB.find(x=>x.id===r.pid)||{};
+        return `<div class="dt">• ${esc(r.name)}｜效期 ${esc(r.expiry)}｜${r.qty} ${esc(r.unit||'')}${p.shelf?`｜📍 ${esc(p.shelf)}`:''}</div>`;
+      }).join('')}
+      <div class="dt" style="margin-top:6px">👉 請到貨架核對實際批號</div></div>`;
+  }
+  box.innerHTML = html;
+  box.dataset.hits = hits.length; box.dataset.qty = total; box.dataset.check = noBatch.length;
+}
+function logRecall(){
+  const name = document.getElementById('rcName').value.trim();
+  const batch = document.getElementById('rcBatch').value.trim();
+  const box = document.getElementById('rcResult');
+  recallLog.unshift({
+    ts: new Date().toLocaleString('zh-TW',{hour12:false}),
+    name, batch,
+    hits: +box.dataset.hits||0, qty: +box.dataset.qty||0, check: +box.dataset.check||0,
+    by: currentOp
+  });
+  try{ localStorage.setItem('pos-recall-log', JSON.stringify(recallLog.slice(0,200))); }catch(e){}
+  renderRecallLog();
+  toast('✓ 已記錄查核結果(稽查時可佐證)');
+}
+function renderRecallLog(){
+  document.getElementById('rcLogCount').textContent = recallLog.length;
+  document.getElementById('rcLog').innerHTML = recallLog.length
+    ? recallLog.slice(0,50).map(l=>`<div class="rec-batch" style="margin-top:6px">
+        <span><b>${esc(l.name||'(未填品名)')}</b>${l.batch?' 批號 '+esc(l.batch):''}<br>
+        <span class="muted" style="font-size:12px">${esc(l.ts)}｜查核人 ${esc(l.by||'—')}｜
+        ${l.hits?`<b style="color:#b3261e">命中 ${l.hits} 批/${l.qty} 件</b>`:'無庫存'}${l.check?`｜待確認 ${l.check} 批`:''}</span></span>
+      </div>`).join('') + '<button class="btn-ghost" style="margin-top:8px" onclick="exportRecallLog()">⬇️ 匯出查核紀錄</button>'
+    : '<p class="muted center" style="padding:10px 0">尚無查核紀錄</p>';
+}
+function exportRecallLog(){
+  if(!recallLog.length){ toast('尚無紀錄'); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recallLog.map(l=>({
+    '查核時間':l.ts,'回收藥品':l.name,'回收批號':l.batch,
+    '結果':l.hits?`命中 ${l.hits} 批`:'店內無此批','數量':l.qty||'','待人工確認批數':l.check||'','查核人':l.by||''
+  }))), '回收查核紀錄');
+  const d=new Date();
+  saveWorkbook(wb, `藥品回收查核紀錄_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+
+/* ================= 冷藏溫度紀錄 ================= */
+let temps = [];
+try{ temps = JSON.parse(localStorage.getItem('pos-temps')||'[]'); }catch(e){ temps=[]; }
+function tempRange(){
+  let r = {min:2, max:8};
+  try{ const s = JSON.parse(localStorage.getItem('pos-temp-range')||'null'); if(s) r = s; }catch(e){}
+  return r;
+}
+function saveTempRange(){
+  const min = parseFloat(document.getElementById('tmpMin').value);
+  const max = parseFloat(document.getElementById('tmpMax').value);
+  if(isNaN(min)||isNaN(max)||min>=max) return;
+  try{ localStorage.setItem('pos-temp-range', JSON.stringify({min,max})); }catch(e){}
+  renderTemp(); toast('合格範圍設為 '+min+'~'+max+'°C');
+}
+function addTemp(){
+  const v = parseFloat(document.getElementById('tmpVal').value);
+  if(isNaN(v)){ toast('請輸入溫度'); return; }
+  const r = tempRange();
+  const now = new Date();
+  const rec = {
+    id:'t'+Date.now(),
+    date: now.getFullYear()+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+String(now.getDate()).padStart(2,'0'),
+    time: String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'),
+    slot: document.getElementById('tmpSlot').value,
+    v, ok: (v>=r.min && v<=r.max), by: currentOp
+  };
+  temps.unshift(rec);
+  try{ localStorage.setItem('pos-temps', JSON.stringify(temps.slice(0,2000))); }catch(e){}
+  document.getElementById('tmpVal').value='';
+  renderTemp();
+  if(!rec.ok){
+    alert('⚠️ 溫度異常!\n\n目前 '+v+'°C,超出合格範圍 '+r.min+'~'+r.max+'°C。\n\n建議立即:\n1. 確認冰箱門是否關緊、電源正常\n2. 檢查冷藏藥品外觀\n3. 記錄處理過程備查');
+  }else{
+    toast('✓ 已登記 '+v+'°C');
+  }
+}
+function delTemp(id){
+  if(!confirm('刪除這筆溫度紀錄?')) return;
+  temps = temps.filter(t=>t.id!==id);
+  try{ localStorage.setItem('pos-temps', JSON.stringify(temps)); }catch(e){}
+  renderTemp();
+}
+function renderTemp(){
+  const r = tempRange();
+  document.getElementById('tmpMin').value = r.min;
+  document.getElementById('tmpMax').value = r.max;
+  const now = new Date();
+  const today = now.getFullYear()+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+String(now.getDate()).padStart(2,'0');
+  const td = temps.filter(t=>t.date===today);
+  const abn30 = temps.filter(t=>!t.ok).slice(0,30).length;
+  document.getElementById('tmpToday').innerHTML =
+    `<div class="stat-row" style="margin-top:12px">
+      <div class="stat"><div class="num" style="color:${td.length?'var(--brand-dk)':'#b26a00'}">${td.length}</div><div class="lbl">今日已量測</div></div>
+      <div class="stat"><div class="num" style="color:${abn30?'#b3261e':'var(--brand-dk)'}">${abn30}</div><div class="lbl">近期異常</div></div>
+    </div>` + (td.length ? '' : '<div class="warn">⚠️ 今天還沒登記冷藏溫度,記得量測唷!</div>');
+  document.getElementById('tmpList').innerHTML = temps.length
+    ? '<p class="muted" style="margin:10px 0 4px">最近紀錄:</p>' + temps.slice(0,20).map(t=>`<div class="rec-batch">
+        <span>${esc(t.date)} ${esc(t.time)}｜${esc(t.slot)}｜
+        <b style="color:${t.ok?'var(--brand-dk)':'#b3261e'}">${t.v}°C</b> ${t.ok?'✓':'⚠️ 異常'}
+        <span class="muted" style="font-size:12px">｜${esc(t.by||'')}</span></span>
+        <button class="btn-sm btn-danger" onclick="delTemp('${t.id}')">刪</button><span></span>
+      </div>`).join('')
+    : '<p class="muted center" style="padding:10px 0">尚無溫度紀錄</p>';
+}
+function exportTemp(){
+  if(!temps.length){ toast('尚無溫度紀錄'); return; }
+  const r = tempRange();
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    temps.slice().reverse().map(t=>({
+      '日期':t.date,'時間':t.time,'時段':t.slot,'溫度(°C)':t.v,
+      '合格範圍':`${r.min}~${r.max}`,'判定':t.ok?'合格':'異常','量測人':t.by||''
+    }))), '冷藏溫度紀錄');
+  const bad = temps.filter(t=>!t.ok);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    bad.length ? bad.map(t=>({'日期':t.date,'時間':t.time,'溫度(°C)':t.v,'量測人':t.by||''}))
+      : [{'日期':'期間內無異常紀錄'}]), '異常紀錄');
+  const d=new Date();
+  saveWorkbook(wb, `冷藏溫度紀錄_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}.xlsx`);
+}
+
+/* ================= 銷燬紀錄表 ================= */
+function exportDestroy(){
+  const wayMap = {expired:'過期銷燬', sold:'已售出/用完', return:'退貨廠商', other:'其他'};
+  const dest = records.filter(r=>r.done && (r.doneWay==='expired'||r.doneWay==='return'||r.doneWay==='other'));
+  if(!dest.length){ toast('尚無銷燬/退貨紀錄'); return; }
+  const rows = dest.map((r,i)=>{
+    const p = DB.find(x=>x.id===r.pid)||{};
+    return {'序號':i+1,'品名':r.name,'批號':r.batch||'','效期':r.expiry,
+      '數量':r.doneQty??r.qty,'單位':r.unit||'','處理方式':wayMap[r.doneWay]||'',
+      '金額(元)':r.loss||'','特殊標記':(p.flags||[]).join('、'),
+      '處理日期':(r.doneTs||'').split(' ')[0],'處理人':r.doneBy||'','備註':''};
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '銷燬紀錄');
+  const ctrl = rows.filter(x=>String(x['特殊標記']).includes('管制藥'));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    ctrl.length?ctrl:[{'序號':'期間內無管制藥品銷燬紀錄'}]), '管制藥品部分');
+  const d=new Date();
+  saveWorkbook(wb, `藥品銷燬紀錄表_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+  // 同時提供列印版
+  setTimeout(()=>{
+    if(!confirm('也要開啟可列印/簽名的紙本格式嗎?')) return;
+    const tr = rows.map(x=>`<tr><td>${x['序號']}</td><td>${esc(x['品名'])}</td><td>${esc(x['批號'])}</td>
+      <td>${esc(x['效期'])}</td><td>${x['數量']} ${esc(x['單位'])}</td><td>${esc(x['處理方式'])}</td>
+      <td>${esc(x['處理日期'])}</td><td>${esc(x['處理人'])}</td><td></td></tr>`).join('');
+    openPrint(`<h1>藥品銷燬紀錄表</h1>
+      <p>製表日期:${new Date().toLocaleDateString('zh-TW')}　共 ${rows.length} 筆</p>
+      <table><thead><tr><th>#</th><th>品名</th><th>批號</th><th>效期</th><th>數量</th>
+        <th>處理方式</th><th>處理日期</th><th>處理人</th><th>簽名</th></tr></thead><tbody>${tr}</tbody></table>
+      <p style="margin-top:22px">負責藥師簽章:______________________　　日期:____________</p>`);
+  }, 800);
+}
+
 /* ================= 進階分析 ================= */
 function dayDiff(a,b){ return Math.round((a-b)/86400000); }
 // 消耗速度:比較同商品前後兩次盤點的數量差,推估每月用量
@@ -1860,7 +2105,7 @@ function applyVoiceDate(text){
   toast('✓ 已填入 '+y+'/'+String(m).padStart(2,'0')+(d?'/'+String(d).padStart(2,'0'):''));
   return true;
 }
-function renderPro(){ renderRisk(); renderZoneSel(); renderZone(); renderMargin(); }
+function renderPro(){ renderRisk(); renderZoneSel(); renderZone(); renderMargin(); renderTemp(); renderRecallLog(); }
 
 /* ================= 低庫存 / 叫貨清單 ================= */
 let orderList = [];
@@ -2100,7 +2345,10 @@ function renderToday(){
   const today = records.filter(r=>{ if(r.done) return false;
     const d = expDate(r.expiry); return d && Math.round((d-now)/86400000)===0; }).length;
   const low = lowStockList().length;
+  const todayStr = new Date().getFullYear()+'/'+String(new Date().getMonth()+1).padStart(2,'0')+'/'+String(new Date().getDate()).padStart(2,'0');
+  const noTemp = (typeof temps!=='undefined') && !temps.some(t=>t.date===todayStr);
   const items = [];
+  if(noTemp) items.push('🧊 今天還沒登記<b>冷藏溫度</b>');
   if(a.past.length) items.push(`<b style="font-size:18px">${a.past.length}</b> 件已過期待處理`);
   if(today) items.push(`<b style="font-size:18px">${today}</b> 件今天到期`);
   if(a.m1.length) items.push(`<b style="font-size:18px">${a.m1.length}</b> 件一個月內到期`);

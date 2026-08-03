@@ -569,7 +569,7 @@ body.dark .seg{background:#0b100f;}
 <script>
 /* ================= 深色模式 ================= */
 (function initTheme(){
-  let t=''; try{ t = localStorage.getItem('pos-theme')||''; }catch(e){}
+  let t=''; try{ t = localStorage.getItem('trial-theme')||''; }catch(e){}
   if(!t && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) t='dark';
   if(t==='dark') document.body.classList.add('dark');
   const b=document.getElementById('themeBtn');
@@ -577,7 +577,7 @@ body.dark .seg{background:#0b100f;}
 })();
 function toggleTheme(){
   const d = document.body.classList.toggle('dark');
-  try{ localStorage.setItem('pos-theme', d?'dark':'light'); }catch(e){}
+  try{ localStorage.setItem('trial-theme', d?'dark':'light'); }catch(e){}
   document.getElementById('themeBtn').textContent = d?'☀️':'🌙';
 }
 
@@ -590,14 +590,14 @@ function pinHash(s){
   return h;
 }
 (function initLock(){
-  try{ PIN_HASH = parseInt(localStorage.getItem('pos-pin-hash')||'0',10)||0; }catch(e){}
+  try{ PIN_HASH = parseInt(localStorage.getItem('trial-pin-hash')||'0',10)||0; }catch(e){}
   const lock = document.getElementById('pinLock');
   if(!PIN_HASH){
     document.getElementById('pinTitle').textContent = '歡迎使用!請設定專屬 PIN 碼';
     document.getElementById('pinSub').textContent = '設定 4~6 位數字,之後每次開啟用它解鎖';
     document.getElementById('pinBtn').textContent = '設定並開始使用';
   }else{
-    try{ const until = +localStorage.getItem('pos-pin-until') || 0;
+    try{ const until = +localStorage.getItem('trial-pin-until') || 0;
       if(Date.now() < until){ lock.style.display='none'; return; } }catch(e){}
   }
   const inp = document.getElementById('pinInput');
@@ -610,14 +610,14 @@ function tryUnlock(){
   if(!PIN_HASH){
     if(!/^\d{4,6}$/.test(v)){ document.getElementById('pinErr').textContent='請輸入 4~6 位數字'; return; }
     PIN_HASH = pinHash(v);
-    try{ localStorage.setItem('pos-pin-hash', String(PIN_HASH)); }catch(e){}
+    try{ localStorage.setItem('trial-pin-hash', String(PIN_HASH)); }catch(e){}
     alert('PIN 碼已設定為:' + v + '\n\n請記下來!忘記需清除瀏覽器資料重設。');
   }else if(pinHash(v) !== PIN_HASH){
     document.getElementById('pinErr').textContent = 'PIN 碼不正確,請再試一次';
     inp.value=''; inp.focus(); return;
   }
   if(document.getElementById('pinRemember').checked){
-    try{ localStorage.setItem('pos-pin-until', String(Date.now() + 30*86400000)); }catch(e){}
+    try{ localStorage.setItem('trial-pin-until', String(Date.now() + 30*86400000)); }catch(e){}
   }
   document.getElementById('pinLock').style.display='none';
 }
@@ -642,7 +642,7 @@ async function sGet(k){
   if(hasClaudeStore()){
     try{ const r = await window.storage.get(k); if(r) return r.value; }catch(e){}
   }
-  try{ const v = localStorage.getItem('pos-'+k); if(v!==null) return v; }catch(e){}
+  try{ const v = localStorage.getItem('trial-'+k); if(v!==null) return v; }catch(e){}
   return memStore[k] ?? null;
 }
 async function sSet(k,v){
@@ -650,19 +650,19 @@ async function sSet(k,v){
   if(hasClaudeStore()){
     try{ const r = await window.storage.set(k,v); if(r) ok = true; }catch(e){}
   }
-  try{ localStorage.setItem('pos-'+k, v); ok = true; }catch(e){}
+  try{ localStorage.setItem('trial-'+k, v); ok = true; }catch(e){}
   if(!ok){ storageOK = false; memStore[k] = v; }
 }
 
 /* ================= 初始化 ================= */
 window.addEventListener('load', async ()=>{
-  const raw = await sGet('pos-products');
+  const raw = await sGet('trial-products');
   if(raw){ loadDB(JSON.parse(raw)); }
   else if(EMBEDDED_DB.length){ loadDB(EMBEDDED_DB); } // 首次開啟直接用內建主檔
-  const rr = await sGet('pos-records');
+  const rr = await sGet('trial-records');
   if(rr){ records = JSON.parse(rr); }
   try{
-    const tr = await sGet('pos-trash');
+    const tr = await sGet('trial-trash');
     if(tr){ trash = JSON.parse(tr).filter(t => Date.now()-(t.delAt||0) < 30*86400000); }
   }catch(e){ trash = []; }
   if(!records.length && EMBEDDED_RECORDS.length){ records = EMBEDDED_RECORDS.slice(); } // 首次開啟載入預載效期
@@ -702,7 +702,7 @@ function parseXlsx(file){
       }
       if(!list.length){ toast('讀不到資料,請確認欄位名稱'); return; }
       loadDB(list);
-      await sSet('pos-products', JSON.stringify(list));
+      await sSet('trial-products', JSON.stringify(list));
       toast(`已載入 ${list.length} 筆商品`);
       enterApp();
     }catch(err){ toast('檔案解析失敗:'+err.message); }
@@ -730,7 +730,7 @@ function enterApp(){
   renderToday();
   checkEnv(); // 檢查瀏覽器環境,揪出三星瀏覽器
   try{ // 備份提醒:超過14天未備份
-    const lb = parseInt(localStorage.getItem('pos-last-backup')||'0',10)||0;
+    const lb = parseInt(localStorage.getItem('trial-last-backup')||'0',10)||0;
     if(records.length > 50 && Date.now()-lb > 14*86400000)
       setTimeout(()=>toast('💾 提醒:超過兩週沒備份囉,到「盤點記錄」按一下備份'), 2500);
   }catch(e){}
@@ -843,11 +843,11 @@ async function startCam(){
   };
   // 一次性重置:清掉先前在錯誤狀態下累積的跳過計數與黑名單
   try{
-    if(!localStorage.getItem('pos-cam-fix2')){
-      localStorage.removeItem('pos-cam-id');
-      localStorage.setItem('pos-cam-skip','0');
-      localStorage.setItem('pos-cam-blacklist','[]');
-      localStorage.setItem('pos-cam-fix2','1');
+    if(!localStorage.getItem('trial-cam-fix2')){
+      localStorage.removeItem('trial-cam-id');
+      localStorage.setItem('trial-cam-skip','0');
+      localStorage.setItem('trial-cam-blacklist','[]');
+      localStorage.setItem('trial-cam-fix2','1');
       camBlacklist = [];
     }
   }catch(e){}
@@ -868,7 +868,7 @@ async function startCam(){
   const queue = [];
   if(mainCam) queue.push({t:{deviceId:{exact:mainCam.id}}, verify:true}); // ⭐ 您欽定的預設鏡頭
   queue.push({t:{facingMode:{exact:'environment'}}, verify:true});
-  try{ const saved = localStorage.getItem('pos-cam-id');
+  try{ const saved = localStorage.getItem('trial-cam-id');
        const sc = camList.find(c=>c.id===saved);
        if(sc && !isFrontCam(sc) && !banned(saved)) queue.unshift({t:{deviceId:{exact:saved}}, verify:true}); }catch(e){}
   otherBacks.forEach(c => queue.push({t:{deviceId:{exact:c.id}}, verify:true}));
@@ -877,7 +877,7 @@ async function startCam(){
   if(anyOk) queue.push({t: anyOk.id, verify:false}); // 保底:至少讓相機開起來
   let started = false, lastErr = null;
   // 跳過計數:您每按一次🙅,就多跳過一個「能開但是自拍」的候選(鏡頭編號浮動也追得到)
-  let skipN = 0; try{ skipN = parseInt(localStorage.getItem('pos-cam-skip')||'0',10)||0; }catch(e){}
+  let skipN = 0; try{ skipN = parseInt(localStorage.getItem('trial-cam-skip')||'0',10)||0; }catch(e){}
   let passed = 0;
   for(const cand of queue){
     try{
@@ -892,7 +892,7 @@ async function startCam(){
       try{ const st = scanner.getRunningTrackSettings(); runId = (st && st.deviceId) || ''; }catch(e){}
       if(cand.verify && runId && banned(runId)){ continue; }
       if(cand.verify && isRunningFront()){
-        if(cand.t.deviceId){ try{ if(localStorage.getItem('pos-cam-id')===cand.t.deviceId.exact) localStorage.removeItem('pos-cam-id'); }catch(e){} }
+        if(cand.t.deviceId){ try{ if(localStorage.getItem('trial-cam-id')===cand.t.deviceId.exact) localStorage.removeItem('trial-cam-id'); }catch(e){} }
         continue;
       }
       if(passed < skipN){ passed++; continue; } // 依您的🙅指示跳過
@@ -901,7 +901,7 @@ async function startCam(){
   }
   if(!started && skipN > 0){
     // 全部候選都被跳過了 → 歸零重來,並提示
-    try{ localStorage.setItem('pos-cam-skip','0'); }catch(e){}
+    try{ localStorage.setItem('trial-cam-skip','0'); }catch(e){}
     toast('所有鏡頭都試過一輪了,已重新開始;建議改用 📸 拍照掃描');
     startCam();
     return;
@@ -960,18 +960,18 @@ async function toggleTorch(){
 }
 let camList = [];
 let camBlacklist = [];
-try{ camBlacklist = JSON.parse(localStorage.getItem('pos-cam-blacklist')||'[]'); }catch(e){ camBlacklist = []; }
-function saveBlacklist(){ try{ localStorage.setItem('pos-cam-blacklist', JSON.stringify(camBlacklist)); }catch(e){} }
+try{ camBlacklist = JSON.parse(localStorage.getItem('trial-cam-blacklist')||'[]'); }catch(e){ camBlacklist = []; }
+function saveBlacklist(){ try{ localStorage.setItem('trial-cam-blacklist', JSON.stringify(camBlacklist)); }catch(e){} }
 async function reportFrontCam(){
   // 使用者親自認證:目前這顆是自拍鏡 → 拉黑 + 跳過計數+1,換下一顆
   let runId = '';
   try{ const st = scanner.getRunningTrackSettings(); runId = (st && st.deviceId) || ''; }catch(e){}
   if(runId && !camBlacklist.includes(runId)){ camBlacklist.push(runId); saveBlacklist(); }
   try{
-    const n = (parseInt(localStorage.getItem('pos-cam-skip')||'0',10)||0) + 1;
-    localStorage.setItem('pos-cam-skip', String(n));
+    const n = (parseInt(localStorage.getItem('trial-cam-skip')||'0',10)||0) + 1;
+    localStorage.setItem('trial-cam-skip', String(n));
   }catch(e){}
-  try{ localStorage.removeItem('pos-cam-id'); }catch(e){}
+  try{ localStorage.removeItem('trial-cam-id'); }catch(e){}
   toast('收到!換下一顆鏡頭…');
   await stopCam();
   startCam();
@@ -991,7 +991,7 @@ function isRunningFront(){
 function renderCamList(){
   try{
     if(camList.length > 1){
-      let saved = ''; try{ saved = localStorage.getItem('pos-cam-id')||''; }catch(e){}
+      let saved = ''; try{ saved = localStorage.getItem('trial-cam-id')||''; }catch(e){}
       let activeId = '';
       try{ const st = scanner.getRunningTrackSettings(); activeId = (st && st.deviceId) || ''; }catch(e){}
       const isFront = c => /front|user|前/i.test(c.label||'');
@@ -1015,12 +1015,12 @@ async function switchCam(id){
   if(!id) return;
   if(id === '__reset'){
     camBlacklist = []; saveBlacklist();
-    try{ localStorage.removeItem('pos-cam-id'); localStorage.setItem('pos-cam-skip','0'); }catch(e){}
+    try{ localStorage.removeItem('trial-cam-id'); localStorage.setItem('trial-cam-skip','0'); }catch(e){}
     toast('已重設鏡頭記錄');
     await stopCam(); startCam();
     return;
   }
-  try{ localStorage.setItem('pos-cam-id', id); }catch(e){}
+  try{ localStorage.setItem('trial-cam-id', id); }catch(e){}
   await stopCam();
   startCam();
   toast('已切換鏡頭,對條碼試掃看看');
@@ -1158,7 +1158,7 @@ async function fillBatch(rid){
   const nb = prompt('補上批號(效期 '+r.expiry+' 這一批)', r.batch||'');
   if(nb===null) return;
   r.batch = nb.trim();
-  await sSet('pos-records', JSON.stringify(records));
+  await sSet('trial-records', JSON.stringify(records));
   if(currentProd) renderDoneBatches();
   toast('✓ 批號已補上');
 }
@@ -1256,7 +1256,7 @@ async function saveRecord(){
     ts: new Date().toLocaleString('zh-TW',{hour12:false}),
     by: currentOp
   });
-  await sSet('pos-records', JSON.stringify(records));
+  await sSet('trial-records', JSON.stringify(records));
   toast(`✓ 已存:${currentProd.name.slice(0,12)}`);
   renderDoneBatches();
   document.getElementById('fBatch').value='';
@@ -1385,8 +1385,8 @@ async function createProduct(){
       }
     }
     loadDB(DB);
-    await sSet('pos-products', JSON.stringify(DB));
-    if(recChanged) await sSet('pos-records', JSON.stringify(records));
+    await sSet('trial-products', JSON.stringify(DB));
+    if(recChanged) await sSet('trial-records', JSON.stringify(records));
     document.getElementById('newProdForm').classList.add('hidden');
     const idx = editingProdIdx; editingProdIdx = null;
     refreshAll();
@@ -1397,7 +1397,7 @@ async function createProduct(){
   // ── 新增模式 ──
   DB.push({id, bc1, bc2, name, unit, stock:'', cat, shelf, minQty, price, vendor, sale, flags});
   loadDB(DB);
-  await sSet('pos-products', JSON.stringify(DB));
+  await sSet('trial-products', JSON.stringify(DB));
   document.getElementById('newProdForm').classList.add('hidden');
   refreshAll();
   toast('✓ 已新增品項:'+name.slice(0,12));
@@ -1418,9 +1418,9 @@ document.getElementById('restoreFile').addEventListener('change', e=>{
       if(!confirm('備份含 '+d.products.length+' 品項、'+d.records.length+' 筆記錄('+String(d.exportedAt||'').slice(0,10)+')。\n還原將「覆蓋」目前資料,確定?')) return;
       DB = d.products; records = d.records; trash = Array.isArray(d.trash)?d.trash:[];
       loadDB(DB);
-      await sSet('pos-products', JSON.stringify(DB));
-      await sSet('pos-records', JSON.stringify(records));
-      await sSet('pos-trash', JSON.stringify(trash));
+      await sSet('trial-products', JSON.stringify(DB));
+      await sSet('trial-records', JSON.stringify(records));
+      await sSet('trial-trash', JSON.stringify(trash));
       refreshAll(); renderRecords();
       toast('✓ 還原完成!');
     }catch(err){ toast('還原失敗:'+err.message); }
@@ -1552,9 +1552,9 @@ function expClass(exp, now){
 async function delRec(rid){
   if(!confirm('確定刪除這筆批次記錄?(會先放進回收桶,30天內可救回)')) return;
   const r = records.find(x=>x.rid===rid);
-  if(r){ trash.push(Object.assign({}, r, {delAt: Date.now()})); await sSet('pos-trash', JSON.stringify(trash)); }
+  if(r){ trash.push(Object.assign({}, r, {delAt: Date.now()})); await sSet('trial-trash', JSON.stringify(trash)); }
   records = records.filter(x=>x.rid!==rid);
-  await sSet('pos-records', JSON.stringify(records));
+  await sSet('trial-records', JSON.stringify(records));
   renderRecords(); refreshAll();
   toast('已移到回收桶');
 }
@@ -1564,15 +1564,15 @@ async function restoreTrash(rid){
   const r = Object.assign({}, t); delete r.delAt;
   records.push(r);
   trash = trash.filter(x=>x.rid!==rid);
-  await sSet('pos-records', JSON.stringify(records));
-  await sSet('pos-trash', JSON.stringify(trash));
+  await sSet('trial-records', JSON.stringify(records));
+  await sSet('trial-trash', JSON.stringify(trash));
   renderRecords(); refreshAll();
   toast('✓ 已救回:'+r.name.slice(0,12));
 }
 async function emptyTrash(){
   if(!confirm('清空回收桶?這次是真的救不回來囉!')) return;
   trash = [];
-  await sSet('pos-trash','[]');
+  await sSet('trial-trash','[]');
   renderRecords();
 }
 function editRec(rid){
@@ -1582,14 +1582,14 @@ function editRec(rid){
   const ne = prompt('效期 (YYYY/MM 或 YYYY/MM/DD)', r.expiry); if(ne===null) return;
   const nq = prompt('數量', r.qty); if(nq===null) return;
   r.batch = nb.trim(); r.expiry = ne.trim(); r.qty = Number(nq)||0;
-  sSet('pos-records', JSON.stringify(records));
+  sSet('trial-records', JSON.stringify(records));
   renderRecords(); refreshAll();
 }
 async function clearAll(){
   if(!confirm('確定清除「全部」盤點記錄?此動作無法復原!')) return;
   if(!confirm('再確認一次:真的要全部清除嗎?')) return;
   records = [];
-  await sSet('pos-records','[]');
+  await sSet('trial-records','[]');
   renderRecords(); refreshAll();
   toast('已清空盤點記錄');
 }
@@ -1624,8 +1624,8 @@ async function loadDemo(){
     {rid:'demo5', pid:'000004', name:demo[3].name, unit:'瓶', bc:demo[3].bc1, batch:'C7788', expiry:mk(5), qty:1, ts:'範例', by:'藥師'}
   ];
   loadDB(demo); records = demoRecs;
-  await sSet('pos-products', JSON.stringify(demo));
-  await sSet('pos-records', JSON.stringify(records));
+  await sSet('trial-products', JSON.stringify(demo));
+  await sSet('trial-records', JSON.stringify(records));
   toast('已載入範例資料,可自由試玩');
   enterApp();
 }
@@ -1651,7 +1651,7 @@ function backupData(){
   const payload = {app:'效期盤點小幫手', ver:1, exportedAt:new Date().toISOString(),
                    products:DB, records:records, trash:trash};
   if(saveTextFile(fn, JSON.stringify(payload))){
-    try{ localStorage.setItem('pos-last-backup', String(Date.now())); }catch(e){}
+    try{ localStorage.setItem('trial-last-backup', String(Date.now())); }catch(e){}
     toast('✓ 已備份 '+fn+'(建議存到雲端)');
   }
 }
@@ -1765,7 +1765,7 @@ function iosNotice(){
 
 /* ================= 藥品回收批號比對 ================= */
 let recallLog = [];
-try{ recallLog = JSON.parse(localStorage.getItem('pos-recall-log')||'[]'); }catch(e){ recallLog=[]; }
+try{ recallLog = JSON.parse(localStorage.getItem('trial-recall-log')||'[]'); }catch(e){ recallLog=[]; }
 function normBatch(s){ return String(s||'').toUpperCase().replace(/[\s\-_.]/g,''); }
 function clearRecall(){
   document.getElementById('rcName').value='';
@@ -1833,7 +1833,7 @@ function logRecall(){
     hits: +box.dataset.hits||0, qty: +box.dataset.qty||0, check: +box.dataset.check||0,
     by: currentOp
   });
-  try{ localStorage.setItem('pos-recall-log', JSON.stringify(recallLog.slice(0,200))); }catch(e){}
+  try{ localStorage.setItem('trial-recall-log', JSON.stringify(recallLog.slice(0,200))); }catch(e){}
   renderRecallLog();
   toast('✓ 已記錄查核結果(稽查時可佐證)');
 }
@@ -1860,17 +1860,17 @@ function exportRecallLog(){
 
 /* ================= 冷藏溫度紀錄 ================= */
 let temps = [];
-try{ temps = JSON.parse(localStorage.getItem('pos-temps')||'[]'); }catch(e){ temps=[]; }
+try{ temps = JSON.parse(localStorage.getItem('trial-temps')||'[]'); }catch(e){ temps=[]; }
 function tempRange(){
   let r = {min:2, max:8};
-  try{ const s = JSON.parse(localStorage.getItem('pos-temp-range')||'null'); if(s) r = s; }catch(e){}
+  try{ const s = JSON.parse(localStorage.getItem('trial-temp-range')||'null'); if(s) r = s; }catch(e){}
   return r;
 }
 function saveTempRange(){
   const min = parseFloat(document.getElementById('tmpMin').value);
   const max = parseFloat(document.getElementById('tmpMax').value);
   if(isNaN(min)||isNaN(max)||min>=max) return;
-  try{ localStorage.setItem('pos-temp-range', JSON.stringify({min,max})); }catch(e){}
+  try{ localStorage.setItem('trial-temp-range', JSON.stringify({min,max})); }catch(e){}
   renderTemp(); toast('合格範圍設為 '+min+'~'+max+'°C');
 }
 function addTemp(){
@@ -1886,7 +1886,7 @@ function addTemp(){
     v, ok: (v>=r.min && v<=r.max), by: currentOp
   };
   temps.unshift(rec);
-  try{ localStorage.setItem('pos-temps', JSON.stringify(temps.slice(0,2000))); }catch(e){}
+  try{ localStorage.setItem('trial-temps', JSON.stringify(temps.slice(0,2000))); }catch(e){}
   document.getElementById('tmpVal').value='';
   renderTemp();
   if(!rec.ok){
@@ -1898,7 +1898,7 @@ function addTemp(){
 function delTemp(id){
   if(!confirm('刪除這筆溫度紀錄?')) return;
   temps = temps.filter(t=>t.id!==id);
-  try{ localStorage.setItem('pos-temps', JSON.stringify(temps)); }catch(e){}
+  try{ localStorage.setItem('trial-temps', JSON.stringify(temps)); }catch(e){}
   renderTemp();
 }
 function renderTemp(){
@@ -2165,12 +2165,12 @@ function renderPro(){ renderRisk(); renderZoneSel(); renderZone(); renderMargin(
 
 /* ================= 低庫存 / 叫貨清單 ================= */
 let orderList = [];
-try{ orderList = JSON.parse(localStorage.getItem('pos-order')||'[]'); }catch(e){ orderList=[]; }
-function saveOrder(){ try{ localStorage.setItem('pos-order', JSON.stringify(orderList)); }catch(e){} }
-function lowTh(){ try{ return parseInt(localStorage.getItem('pos-low-th')||'3',10)||3; }catch(e){ return 3; } }
+try{ orderList = JSON.parse(localStorage.getItem('trial-order')||'[]'); }catch(e){ orderList=[]; }
+function saveOrder(){ try{ localStorage.setItem('trial-order', JSON.stringify(orderList)); }catch(e){} }
+function lowTh(){ try{ return parseInt(localStorage.getItem('trial-low-th')||'3',10)||3; }catch(e){ return 3; } }
 function setLowTh(v){
   const n = parseInt(v,10); if(isNaN(n)||n<0) return;
-  try{ localStorage.setItem('pos-low-th', String(n)); }catch(e){}
+  try{ localStorage.setItem('trial-low-th', String(n)); }catch(e){}
   renderBuy(); renderToday(); toast('預設安全存量設為 '+n);
 }
 function currentQty(p){
@@ -2180,9 +2180,9 @@ function currentQty(p){
   if(has) return sum;
   return (p.stock===''||p.stock===null||isNaN(Number(p.stock))) ? null : Number(p.stock);
 }
-function incZero(){ try{ return localStorage.getItem('pos-inc-zero')==='1'; }catch(e){ return false; } }
+function incZero(){ try{ return localStorage.getItem('trial-inc-zero')==='1'; }catch(e){ return false; } }
 function toggleIncZero(on){
-  try{ localStorage.setItem('pos-inc-zero', on?'1':'0'); }catch(e){}
+  try{ localStorage.setItem('trial-inc-zero', on?'1':'0'); }catch(e){}
   renderBuy(); renderToday();
 }
 function lowStockList(){
@@ -2359,9 +2359,9 @@ function showSimilarWarn(prod){
 /* ================= 操作者(多人使用) ================= */
 let operators = [], currentOp = '';
 function loadOperators(){
-  try{ operators = JSON.parse(localStorage.getItem('pos-operators')||'[]'); }catch(e){ operators=[]; }
+  try{ operators = JSON.parse(localStorage.getItem('trial-operators')||'[]'); }catch(e){ operators=[]; }
   if(!operators.length) operators = ['藥師'];
-  try{ currentOp = localStorage.getItem('pos-current-op')||operators[0]; }catch(e){ currentOp = operators[0]; }
+  try{ currentOp = localStorage.getItem('trial-current-op')||operators[0]; }catch(e){ currentOp = operators[0]; }
   if(!operators.includes(currentOp)) currentOp = operators[0];
   renderOperators();
 }
@@ -2377,7 +2377,7 @@ function setOperator(v){
     const n = prompt('新增操作者名稱(例:小美、王藥師)');
     if(n && n.trim() && !operators.includes(n.trim())){
       operators.push(n.trim()); currentOp = n.trim();
-      try{ localStorage.setItem('pos-operators', JSON.stringify(operators)); }catch(e){}
+      try{ localStorage.setItem('trial-operators', JSON.stringify(operators)); }catch(e){}
       toast('已新增操作者:'+currentOp);
     }
   }else if(v==='__del'){
@@ -2385,10 +2385,10 @@ function setOperator(v){
     else if(confirm('移除操作者「'+currentOp+'」?(已登記的記錄不受影響)')){
       operators = operators.filter(o=>o!==currentOp);
       currentOp = operators[0];
-      try{ localStorage.setItem('pos-operators', JSON.stringify(operators)); }catch(e){}
+      try{ localStorage.setItem('trial-operators', JSON.stringify(operators)); }catch(e){}
     }
   }else{ currentOp = v; }
-  try{ localStorage.setItem('pos-current-op', currentOp); }catch(e){}
+  try{ localStorage.setItem('trial-current-op', currentOp); }catch(e){}
   renderOperators();
 }
 
@@ -2541,7 +2541,7 @@ async function confirmDone(){
   r.price = p || r.price || 0;
   r.loss = (way==='expired') ? Math.round(q * (p || r.price || 0)) : 0;
   r.doneBy = currentOp;
-  await sSet('pos-records', JSON.stringify(records));
+  await sSet('trial-records', JSON.stringify(records));
   closeDoneModal();
   renderAlert(); renderToday();
   toast(r.loss ? `✓ 已結案(損失 ${r.loss.toLocaleString()} 元)` : '✓ 已結案:'+r.name.slice(0,12));
@@ -2550,7 +2550,7 @@ async function undoDone(rid){
   const r = records.find(x=>x.rid===rid);
   if(!r) return;
   r.done = false; delete r.doneTs;
-  await sSet('pos-records', JSON.stringify(records));
+  await sSet('trial-records', JSON.stringify(records));
   renderAlert();
   toast('已復原為待處理');
 }

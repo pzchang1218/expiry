@@ -407,6 +407,7 @@ body.dark .seg{background:#0b100f;}
       <button class="btn-main" style="margin-top:10px;background:#7a4b8a" onclick="exportDestroy()">📄 產生銷燬紀錄表</button>
       <button class="btn-main" style="margin-top:10px" onclick="exportXlsx()">⬇️ 匯出盤點結果 Excel</button>
       <button class="btn-ghost" style="margin-top:10px" onclick="reUpload()">🔄 更新商品主檔</button>
+      <button class="btn-ghost" style="margin-top:10px" onclick="restoreBuiltin()">♻️ 還原內建商品資料(4,968 筆)</button>
       <div class="row2" style="margin-top:10px">
         <button class="btn-ghost" onclick="backupData()">💾 備份資料</button>
         <button class="btn-ghost" onclick="document.getElementById('restoreFile').click()">📂 還原備份</button>
@@ -1571,6 +1572,18 @@ async function clearAll(){
   await sSet('pos-records','[]');
   renderRecords(); refreshAll();
   toast('已清空盤點記錄');
+}
+async function restoreBuiltin(){
+  if(!EMBEDDED_DB.length){ toast('此版本沒有內建資料'); return; }
+  const keepRec = confirm('要「保留」目前的盤點記錄嗎?\n\n確定 = 只還原商品清單,盤點記錄保留\n取消 = 商品與效期記錄全部還原成內建版本');
+  loadDB(EMBEDDED_DB.slice());
+  await sSet('pos-products', JSON.stringify(DB));
+  if(!keepRec){
+    records = EMBEDDED_RECORDS.slice();
+    await sSet('pos-records', JSON.stringify(records));
+  }
+  refreshAll(); renderRecords(); renderToday();
+  toast('♻️ 已還原 '+DB.length+' 筆商品'+(keepRec?'':' 與 '+records.length+' 筆效期記錄'));
 }
 function reUpload(){ document.getElementById('dbFile2').click(); }
 

@@ -1,5 +1,5 @@
 // v2:index.html 改為「網路優先」,每次部署的新版都能立即到手;離線時才用快取
-const CACHE = 'pos-expiry-v3';
+const CACHE = 'pos-expiry-v4';
 const PRECACHE = [
   './index.html', './manifest.json', './icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

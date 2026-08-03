@@ -120,6 +120,19 @@ label{font-size:12px; color:var(--ink2); font-weight:700; display:block; margin:
   .badge{ min-width:calc(33.33% - 6px); }
 }
 
+
+/* ===== iOS / Safari 相容性 ===== */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+/* iOS 聚焦字級 <16px 的輸入框時會自動放大整頁,一律 ≥16px */
+input, select, textarea{ font-size:16px !important; }
+/* iOS 下拉選單外觀一致化 */
+select{ -webkit-appearance:none; appearance:none;
+  background-image:url("data:image/svg+xml;charset=utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; background-size:11px;
+  padding-right:34px; }
+/* iOS 慣性捲動 */
+body{ -webkit-overflow-scrolling:touch; }
+
 .note{background:var(--brass-lt); border-left:4px solid var(--brass); border-radius:8px;
   padding:11px; font-size:12.5px; line-height:1.8; color:#6a5320;}
 </style>

@@ -115,6 +115,14 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 .warn{background:var(--amber-lt); color:var(--amber); border-radius:10px; padding:10px; font-size:13px; line-height:1.6; margin-top:8px;}
 .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 .center{text-align:center;}
+.flagbox{display:flex;align-items:center;gap:4px;font-size:13px;background:var(--bg);
+  border:1px solid var(--line);border-radius:99px;padding:6px 11px;cursor:pointer;margin:0;}
+.flagbox input{width:auto;}
+.flag{display:inline-block;font-size:11px;font-weight:800;border-radius:99px;padding:2px 8px;margin-left:5px;}
+.fl-管制藥{background:#fbe9e7;color:#b3261e;} .fl-冷藏{background:#e3f2fd;color:#1565c0;}
+.fl-避光{background:#ede7f6;color:#5e35b1;} .fl-易碎{background:#fff3e0;color:#e65100;}
+.fl-處方箋{background:#e8f5e9;color:#2e7d32;}
+
 
 /* ===== 窄螢幕最佳化(Fold 封面螢幕、小尺寸手機)===== */
 /* 長英文品名不撐破版面 */
@@ -306,7 +314,19 @@ body.dark .seg{background:#0b100f;}
         </div>
         <div class="row2">
           <div><label>安全存量(低於此數提醒叫貨)</label><input id="npMin" type="number" inputmode="numeric" placeholder="留空用預設"></div>
-          <div><label>參考單價(算損失用)</label><input id="npPrice" type="number" inputmode="decimal" placeholder="選填"></div>
+          <div><label>供應商 / 廠商</label><input id="npVendor" list="vendorList" placeholder="叫貨單依此分組" autocomplete="off"><datalist id="vendorList"></datalist></div>
+        </div>
+        <div class="row2">
+          <div><label>進價(成本)</label><input id="npPrice" type="number" inputmode="decimal" placeholder="算損失用"></div>
+          <div><label>售價</label><input id="npSale" type="number" inputmode="decimal" placeholder="算毛利用"></div>
+        </div>
+        <label>特殊標記(可多選)</label>
+        <div id="npFlags" style="display:flex;flex-wrap:wrap;gap:6px">
+          <label class="flagbox"><input type="checkbox" value="管制藥"> 🔴 管制藥</label>
+          <label class="flagbox"><input type="checkbox" value="冷藏"> 🧊 冷藏</label>
+          <label class="flagbox"><input type="checkbox" value="避光"> 🌑 避光</label>
+          <label class="flagbox"><input type="checkbox" value="易碎"> ⚠️ 易碎</label>
+          <label class="flagbox"><input type="checkbox" value="處方箋"> 📝 需處方</label>
         </div>
         <div class="row2" style="margin-top:14px">
           <button class="btn-line" onclick="toggleNewProd()">取消</button>
@@ -345,6 +365,7 @@ body.dark .seg{background:#0b100f;}
         <button class="btn-sm btn-line" onclick="quickExp(2)">+2年</button>
         <button class="btn-sm btn-line" onclick="quickExp(3)">+3年</button>
         <button class="btn-sm btn-line" onclick="sameAsLast()">📋 同上一筆</button>
+        <button class="btn-sm btn-line" id="micBtn" onclick="voiceExpiry()">🎙️ 唸效期</button>
       </div>
 
       <label>數量</label>
@@ -444,6 +465,34 @@ body.dark .seg{background:#0b100f;}
       <button class="btn-ghost" style="margin-top:8px" onclick="printOrder()">🖨️ 列印/傳送叫貨單</button>
       <button class="btn-sm btn-danger" style="margin-top:8px;width:100%" onclick="clearOrder()">清空叫貨清單</button>
     </div>
+    <div class="card">
+      <h2>📉 呆滯品分析</h2>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">超過設定天數沒有任何盤點異動的商品 — 佔資金也佔空間</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="muted" style="white-space:nowrap">停滯超過</span>
+        <input id="staleDays" type="number" inputmode="numeric" value="180" style="flex:1" onchange="renderStale()">
+        <span class="muted">天</span>
+      </div>
+      <div id="staleList"></div>
+    </div>
+  </section>
+
+  <!-- ============ 分析(風險預警 / 分區盤點 / 毛利) ============ -->
+  <section id="viewPro" class="hidden">
+    <div class="card">
+      <h2>🔮 過期風險預警</h2>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">依商品的歷史消耗速度,推估效期內是否賣得完</p>
+      <div id="riskBox"></div>
+    </div>
+    <div class="card">
+      <h2>📋 分區盤點</h2>
+      <select id="zoneSel" onchange="renderZone()"></select>
+      <div id="zoneBox"></div>
+    </div>
+    <div class="card">
+      <h2>💰 毛利與損失對照</h2>
+      <div id="marginBox"></div>
+    </div>
   </section>
 
 </main>
@@ -476,6 +525,7 @@ body.dark .seg{background:#0b100f;}
   <button id="tabAlert" onclick="showView('alert')"><span class="ico">⏰</span>效期警示</button>
   <button id="tabRec" onclick="showView('records')"><span class="ico">📋</span>盤點記錄</button>
   <button id="tabBuy" onclick="showView('buy')"><span class="ico">🛒</span>補貨叫貨</button>
+  <button id="tabPro" onclick="showView('pro')"><span class="ico">🔮</span>分析</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -512,10 +562,8 @@ function pinHash(s){
     document.getElementById('pinSub').textContent = '設定 4~6 位數字,之後每次開啟用它解鎖';
     document.getElementById('pinBtn').textContent = '設定並開始使用';
   }else{
-    try{
-      const until = +localStorage.getItem('pos-pin-until') || 0;
-      if(Date.now() < until){ lock.style.display='none'; return; }
-    }catch(e){}
+    try{ const until = +localStorage.getItem('pos-pin-until') || 0;
+      if(Date.now() < until){ lock.style.display='none'; return; } }catch(e){}
   }
   const inp = document.getElementById('pinInput');
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter') tryUnlock(); });
@@ -528,7 +576,7 @@ function tryUnlock(){
     if(!/^\d{4,6}$/.test(v)){ document.getElementById('pinErr').textContent='請輸入 4~6 位數字'; return; }
     PIN_HASH = pinHash(v);
     try{ localStorage.setItem('pos-pin-hash', String(PIN_HASH)); }catch(e){}
-    alert('PIN 碼已設定為:' + v + '\n\n請記下來!忘記的話需要清除瀏覽器資料重設,盤點記錄會一併消失。');
+    alert('PIN 碼已設定為:' + v + '\n\n請記下來!忘記需清除瀏覽器資料重設。');
   }else if(pinHash(v) !== PIN_HASH){
     document.getElementById('pinErr').textContent = 'PIN 碼不正確,請再試一次';
     inp.value=''; inp.focus(); return;
@@ -611,7 +659,10 @@ function parseXlsx(file){
           cat:String(r['分類']??'').trim(),
           shelf:String(r['貨架']??r['貨架位置']??'').trim(),
           minQty:String(r['安全存量']??'').trim(),
-          price:String(r['單價']??r['成本']??'').trim()
+          price:String(r['單價']??r['成本']??r['進價']??'').trim(),
+          vendor:String(r['供應商']??r['廠商']??'').trim(),
+          sale:String(r['售價']??'').trim(),
+          flags:String(r['標記']??'').split(/[,、\/]/).map(s=>s.trim()).filter(Boolean)
         });
       }
       if(!list.length){ toast('讀不到資料,請確認欄位名稱'); return; }
@@ -657,14 +708,17 @@ function showView(v){
   document.getElementById('viewRecords').classList.toggle('hidden', v!=='records');
   document.getElementById('viewAlert').classList.toggle('hidden', v!=='alert');
   document.getElementById('viewBuy').classList.toggle('hidden', v!=='buy');
+  document.getElementById('viewPro').classList.toggle('hidden', v!=='pro');
   document.getElementById('tabScan').classList.toggle('active', v==='scan');
   document.getElementById('tabRec').classList.toggle('active', v==='records');
   document.getElementById('tabAlert').classList.toggle('active', v==='alert');
   document.getElementById('tabBuy').classList.toggle('active', v==='buy');
+  document.getElementById('tabPro').classList.toggle('active', v==='pro');
   if(v==='scan'){ renderToday(); }
   if(v==='records'){ renderRecords(); stopCam(); }
   if(v==='alert'){ renderAlert(); stopCam(); }
-  if(v==='buy'){ renderBuy(); stopCam(); }
+  if(v==='buy'){ renderBuy(); renderStale(); stopCam(); }
+  if(v==='pro'){ renderPro(); stopCam(); }
 }
 
 /* ================= 相機掃描 ================= */
@@ -982,7 +1036,7 @@ function search(q){
   }
   box.innerHTML = hits.length
     ? hits.map(i=>`<div class="result-item" onclick="openForm(${i})">
-        <div class="nm">${esc(DB[i].name)}</div>
+        <div class="nm">${esc(DB[i].name)}${flagBadges(DB[i])}</div>
         <div class="bc">編號 ${esc(DB[i].id)}｜條碼 ${esc(DB[i].bc1||'—')}${DB[i].bc2?'／'+esc(DB[i].bc2):''}</div>
       </div>`).join('')
     : '<p class="muted" style="padding:8px 0">找不到符合的商品</p>';
@@ -1030,7 +1084,9 @@ function openForm(i){
   document.getElementById('pMeta').innerHTML =
     `編號 ${esc(currentProd.id)}｜單位 ${esc(currentProd.unit||'—')}｜帳面庫存 ${currentProd.stock===''?'—':currentProd.stock}`
     + (currentProd.shelf?`<br>📍 貨架 <b>${esc(currentProd.shelf)}</b>`:'')
-    + (currentProd.cat?`　🏷️ ${esc(currentProd.cat)}`:'');
+    + (currentProd.cat?`　🏷️ ${esc(currentProd.cat)}`:'')
+    + (currentProd.vendor?`<br>🏭 ${esc(currentProd.vendor)}`:'')
+    + (currentProd.flags&&currentProd.flags.length?`<br>${flagBadges(currentProd)}`:'');
   const ob = document.getElementById('btnOrder');
   if(ob) ob.textContent = orderList.some(o=>o.pid===currentProd.id) ? '✓ 已在叫貨清單(點此移除)' : '🛒 加入叫貨清單';
   document.getElementById('fBatch').value='';
@@ -1183,11 +1239,16 @@ async function createManual(){
 }
 /* ================= 新增/編輯品項 ================= */
 let editingProdIdx = null; // null=新增模式,數字=編輯DB中該索引的品項
+function setFlags(arr){
+  document.querySelectorAll('#npFlags input').forEach(c=>c.checked = arr.includes(c.value));
+}
 function refreshShelfList(){
   const dl = document.getElementById('shelfList');
   if(!dl) return;
   const set = [...new Set(DB.map(p=>p.shelf).filter(Boolean))].sort();
   dl.innerHTML = set.map(s=>`<option>${esc(s)}</option>`).join('');
+  const vl = document.getElementById('vendorList');
+  if(vl){ vl.innerHTML = [...new Set(DB.map(p=>p.vendor).filter(Boolean))].sort().map(s=>`<option>${esc(s)}</option>`).join(''); }
 }
 function nextProdId(){
   let mx = 0;
@@ -1206,8 +1267,8 @@ function toggleNewProd(){
     document.getElementById('npBc2').value='';
     document.getElementById('npUnit').value='';
     document.getElementById('npId').value = nextProdId();
-    ['npCat','npShelf','npMin','npPrice'].forEach(i=>document.getElementById(i).value='');
-    refreshShelfList();
+    ['npCat','npShelf','npMin','npPrice','npVendor','npSale'].forEach(i=>document.getElementById(i).value='');
+    setFlags([]); refreshShelfList();
     document.getElementById('npName').focus();
   }else{
     editingProdIdx = null;
@@ -1230,6 +1291,9 @@ function editProduct(){
   document.getElementById('npShelf').value = currentProd.shelf||'';
   document.getElementById('npMin').value = currentProd.minQty||'';
   document.getElementById('npPrice').value = currentProd.price||'';
+  document.getElementById('npVendor').value = currentProd.vendor||'';
+  document.getElementById('npSale').value = currentProd.sale||'';
+  setFlags(currentProd.flags||[]);
   refreshShelfList();
   f.scrollIntoView({behavior:'smooth', block:'center'});
   document.getElementById('npName').focus();
@@ -1245,8 +1309,8 @@ function openNewProd(bc, name){
   document.getElementById('npBc2').value = '';
   document.getElementById('npUnit').value = '';
   document.getElementById('npId').value = nextProdId();
-  ['npCat','npShelf','npMin','npPrice'].forEach(i=>document.getElementById(i).value='');
-  refreshShelfList();
+  ['npCat','npShelf','npMin','npPrice','npVendor','npSale'].forEach(i=>document.getElementById(i).value='');
+  setFlags([]); refreshShelfList();
   f.scrollIntoView({behavior:'smooth', block:'center'});
   document.getElementById(name ? 'npUnit' : 'npName').focus();
 }
@@ -1268,12 +1332,16 @@ async function createProduct(){
   const shelf = document.getElementById('npShelf').value.trim();
   const minQty = document.getElementById('npMin').value.trim();
   const price = document.getElementById('npPrice').value.trim();
+  const vendor = document.getElementById('npVendor').value.trim();
+  const sale = document.getElementById('npSale').value.trim();
+  const flags = [...document.querySelectorAll('#npFlags input:checked')].map(c=>c.value);
   if(editingProdIdx !== null){
     // ── 編輯模式:更新品項 + 同步該品項所有歷史記錄 ──
     const p = DB[editingProdIdx];
     const oldId = p.id;
     p.id = id; p.bc1 = bc1; p.bc2 = bc2; p.name = name; p.unit = unit;
     p.cat = cat; p.shelf = shelf; p.minQty = minQty; p.price = price;
+    p.vendor = vendor; p.sale = sale; p.flags = flags;
     let recChanged = false;
     for(const r of records){
       if(r.pid === oldId){
@@ -1292,7 +1360,7 @@ async function createProduct(){
     return;
   }
   // ── 新增模式 ──
-  DB.push({id, bc1, bc2, name, unit, stock:'', cat, shelf, minQty, price});
+  DB.push({id, bc1, bc2, name, unit, stock:'', cat, shelf, minQty, price, vendor, sale, flags});
   loadDB(DB);
   await sSet('pos-products', JSON.stringify(DB));
   document.getElementById('newProdForm').classList.add('hidden');
@@ -1492,7 +1560,6 @@ async function clearAll(){
 }
 function reUpload(){ document.getElementById('dbFile2').click(); }
 
-
 /* ================= 試用版:範本與範例資料 ================= */
 function downloadTemplate(){
   const rows = [
@@ -1661,6 +1728,196 @@ function iosNotice(){
   w.classList.remove('hidden');
 }
 
+/* ================= 進階分析 ================= */
+function dayDiff(a,b){ return Math.round((a-b)/86400000); }
+// 消耗速度:比較同商品前後兩次盤點的數量差,推估每月用量
+function consumeRate(pid){
+  const rs = records.filter(r=>r.pid===pid && r.ts && r.qty>0)
+    .map(r=>({t: parseTs(r.ts), q: Number(r.qty)||0}))
+    .filter(x=>x.t).sort((a,b)=>a.t-b.t);
+  if(rs.length < 2) return null;
+  const first = rs[0], last = rs[rs.length-1];
+  const days = dayDiff(last.t, first.t);
+  if(days < 14) return null; // 觀察期太短,不推估
+  const totalIn = rs.reduce((s,x)=>s+x.q,0);
+  const used = totalIn - last.q;
+  if(used <= 0) return 0;
+  return (used / days) * 30; // 每月用量
+}
+function parseTs(s){
+  const m = String(s||'').match(/(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+function riskList(){
+  const now = new Date(); now.setHours(0,0,0,0);
+  const out = [];
+  for(const r of records){
+    if(r.done || !(r.qty>0)) continue;
+    const d = expDate(r.expiry); if(!d) continue;
+    const days = dayDiff(d, now);
+    if(days < 0 || days > 730) continue;
+    const rate = consumeRate(r.pid);
+    if(rate === null) continue;
+    const canSell = rate * (days/30);
+    const leftover = Math.round(r.qty - canSell);
+    if(leftover > 0) out.push({r, days, rate, leftover});
+  }
+  return out.sort((a,b)=>b.leftover - a.leftover);
+}
+function renderRisk(){
+  const list = riskList();
+  const box = document.getElementById('riskBox');
+  if(!list.length){
+    const enough = records.some(r=>consumeRate(r.pid)!==null);
+    box.innerHTML = enough
+      ? '<p class="muted center" style="padding:10px 0">目前沒有預估會賣不完的批次 👍</p>'
+      : '<p class="muted" style="padding:6px 0">資料還不夠推估消耗速度。<br>同一商品盤點兩次以上、間隔超過兩週後,這裡就會出現預測 📈</p>';
+    return;
+  }
+  box.innerHTML = list.slice(0,40).map(x=>{
+    const p = DB.find(y=>y.id===x.r.pid) || {};
+    const lossAmt = Math.round(x.leftover * (Number(p.price)||Number(x.r.price)||0));
+    return `<div class="alert-item ${x.days<=92?'al-m3':'al-m6'}">
+      <div class="nm">${esc(x.r.name)}</div>
+      <div class="dt">效期 ${esc(x.r.expiry)}(剩 ${x.days} 天)｜庫存 ${x.r.qty} ${esc(x.r.unit||'')}<br>
+        月均消耗約 <b>${x.rate.toFixed(1)}</b>｜期限內約可賣 ${Math.round(x.rate*(x.days/30))}
+        → <b style="color:#b3261e">預估剩 ${x.leftover} ${esc(x.r.unit||'')}</b>${lossAmt?`(約 ${lossAmt.toLocaleString()} 元)`:''}</div>
+      <button class="btn-sm btn-line" style="margin-top:8px" onclick="showView('scan');lookup('${esc(x.r.bc||'')}')">查看此商品</button>
+    </div>`;
+  }).join('') + '<p class="tiny muted" style="margin-top:8px">※ 推估僅供參考,實際依季節與促銷而異</p>';
+}
+/* ---- 分區盤點 ---- */
+function renderZoneSel(){
+  const zones = [...new Set(DB.map(p=>p.shelf).filter(Boolean))].sort();
+  const sel = document.getElementById('zoneSel');
+  const cur = sel.value;
+  sel.innerHTML = zones.length
+    ? '<option value="">— 選擇貨架區 —</option>' + zones.map(z=>`<option ${z===cur?'selected':''}>${esc(z)}</option>`).join('')
+    : '<option value="">尚未設定貨架位置(請在編輯品項時填寫)</option>';
+}
+function renderZone(){
+  const z = document.getElementById('zoneSel').value;
+  const box = document.getElementById('zoneBox');
+  if(!z){ box.innerHTML=''; return; }
+  const items = DB.filter(p=>p.shelf===z);
+  const done = new Set(records.map(r=>r.pid));
+  const ok = items.filter(p=>done.has(p.id)), todo = items.filter(p=>!done.has(p.id));
+  const pct = Math.round(ok.length/Math.max(items.length,1)*100);
+  box.innerHTML = `
+    <div style="margin:10px 0 8px">
+      <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700">
+        <span>📍 ${esc(z)} 區進度</span><span>${ok.length} / ${items.length}(${pct}%)</span></div>
+      <div class="progress-bar" style="background:var(--line);margin-top:6px">
+        <div style="width:${pct}%;background:var(--brand);height:5px;border-radius:99px"></div></div>
+    </div>
+    ${todo.length ? '<p class="muted" style="margin:10px 0 4px">尚未盤點:</p>' + todo.slice(0,60).map(p=>{
+      const i = DB.indexOf(p);
+      return `<div class="result-item" onclick="showView('scan');openForm(${i})">
+        <div class="nm">${esc(p.name)}${flagBadges(p)}</div>
+        <div class="bc">編號 ${esc(p.id)}${p.cat?'｜'+esc(p.cat):''}</div></div>`;
+    }).join('') : '<p class="muted center" style="padding:10px 0">🎉 這一區全部盤完了!</p>'}`;
+}
+function flagBadges(p){
+  if(!p.flags || !p.flags.length) return '';
+  const ic = {'管制藥':'🔴','冷藏':'🧊','避光':'🌑','易碎':'⚠️','處方箋':'📝'};
+  return p.flags.map(f=>`<span class="flag fl-${f}">${ic[f]||''} ${esc(f)}</span>`).join('');
+}
+/* ---- 毛利與損失對照 ---- */
+function renderMargin(){
+  const rows = [];
+  for(const p of DB){
+    const cost = Number(p.price)||0, sale = Number(p.sale)||0;
+    if(!cost || !sale) continue;
+    const profit = sale - cost;
+    if(profit <= 0) continue;
+    const loss = records.filter(r=>r.pid===p.id && r.loss>0).reduce((s,r)=>s+r.loss,0);
+    rows.push({p, profit, cost, need: Math.ceil(cost/profit), loss});
+  }
+  const box = document.getElementById('marginBox');
+  if(!rows.length){
+    box.innerHTML = '<p class="muted" style="padding:6px 0">請先在「編輯品項」填入<b>進價</b>與<b>售價</b>,這裡就會顯示:<br>「賣掉幾個的利潤,才能補回一個過期的損失」📊</p>';
+    return;
+  }
+  rows.sort((a,b)=>b.need - a.need);
+  box.innerHTML = rows.slice(0,30).map(x=>`<div class="rec-batch">
+      <span><b>${esc(x.p.name)}</b><br><span class="muted" style="font-size:12px">
+        進價 ${x.cost}｜售價 ${Number(x.p.sale)}｜毛利 ${x.profit}
+        → 過期 1 個要賣 <b style="color:#b3261e">${x.need}</b> 個才補得回來${x.loss?`｜已損失 ${x.loss.toLocaleString()} 元`:''}</span></span>
+    </div>`).join('');
+}
+/* ---- 呆滯品 ---- */
+function renderStale(){
+  const days = parseInt(document.getElementById('staleDays').value,10) || 180;
+  const now = new Date();
+  const lastMove = {};
+  for(const r of records){
+    const t = parseTs(r.ts) || parseTs(r.doneTs);
+    if(t && (!lastMove[r.pid] || t > lastMove[r.pid])) lastMove[r.pid] = t;
+  }
+  const stale = DB.filter(p=>{
+    const q = currentQty(p);
+    if(!(q>0)) return false;               // 沒庫存不算呆滯
+    const t = lastMove[p.id];
+    return !t || dayDiff(now, t) >= days;
+  }).map(p=>({p, q:currentQty(p), d: lastMove[p.id] ? dayDiff(now, lastMove[p.id]) : null,
+              money: Math.round((currentQty(p)||0) * (Number(p.price)||0))}))
+    .sort((a,b)=>b.money - a.money);
+  const total = stale.reduce((s,x)=>s+x.money,0);
+  document.getElementById('staleList').innerHTML = stale.length
+    ? `<p class="muted" style="margin:10px 0 6px">共 <b>${stale.length}</b> 項${total?`,積壓約 <b style="color:#b26a00">${total.toLocaleString()}</b> 元`:''}</p>`
+      + stale.slice(0,50).map(x=>`<div class="rec-batch">
+          <span><b>${esc(x.p.name)}</b>${flagBadges(x.p)}<br><span class="muted" style="font-size:12px">
+          庫存 ${x.q} ${esc(x.p.unit||'')}${x.p.shelf?'｜📍'+esc(x.p.shelf):''}｜
+          ${x.d===null?'無異動紀錄':'已 '+x.d+' 天沒異動'}${x.money?'｜約 '+x.money.toLocaleString()+' 元':''}</span></span>
+        </div>`).join('')
+      + (stale.length>50?`<p class="muted center" style="padding:8px 0">…還有 ${stale.length-50} 項</p>`:'')
+    : '<p class="muted center" style="padding:10px 0">沒有呆滯品,週轉很健康 ✨</p>';
+}
+/* ---- 語音輸入效期 ---- */
+function voiceExpiry(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ toast('這個瀏覽器不支援語音輸入,請改用 Chrome'); return; }
+  const rec = new SR();
+  rec.lang = 'zh-TW'; rec.interimResults = false; rec.maxAlternatives = 3;
+  const btn = document.getElementById('micBtn');
+  btn.textContent = '🔴 聽取中…';
+  rec.onresult = e=>{
+    let got = false;
+    for(let i=0;i<e.results[0].length && !got;i++){
+      got = applyVoiceDate(e.results[0][i].transcript);
+    }
+    btn.textContent = '🎙️ 唸效期';
+    if(!got) toast('聽不太懂,可以說「2027年9月」或「2027 9 30」');
+  };
+  rec.onerror = ()=>{ btn.textContent='🎙️ 唸效期'; toast('語音辨識失敗,請確認麥克風權限'); };
+  rec.onend = ()=>{ btn.textContent='🎙️ 唸效期'; };
+  try{ rec.start(); toast('請說效期,例如「2027年9月30日」'); }
+  catch(e){ btn.textContent='🎙️ 唸效期'; }
+}
+function applyVoiceDate(text){
+  const zh = {'零':'0','〇':'0','一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};
+  let s = String(text||'');
+  s = s.replace(/[零〇一二三四五六七八九]/g, c=>zh[c]);
+  const nums = s.match(/\d+/g);
+  if(!nums || !nums.length) return false;
+  let y=null, m=null, d=null;
+  const ym = s.match(/(\d{2,4})\s*年/); const mm = s.match(/(\d{1,2})\s*月/); const dd = s.match(/(\d{1,2})\s*[日號]/);
+  if(ym) y = +ym[1]; if(mm) m = +mm[1]; if(dd) d = +dd[1];
+  if(y===null){ // 沒說「年」→ 依序解讀
+    const parts = nums.map(Number);
+    if(parts[0] > 1900){ y = parts[0]; m = parts[1]; d = parts[2]; }
+    else if(String(parts[0]).length<=2 && parts.length>=2){ y = 2000 + parts[0]; m = parts[1]; d = parts[2]; }
+  }
+  if(y!==null && y < 100) y += 2000;
+  if(y===null || !m || m<1 || m>12) return false;
+  if(d && (d<1 || d>31)) d = null;
+  setExpMode(d ? 'd' : 'm');
+  setExpiryParts(String(y), String(m).padStart(2,'0'), d?String(d).padStart(2,'0'):'');
+  toast('✓ 已填入 '+y+'/'+String(m).padStart(2,'0')+(d?'/'+String(d).padStart(2,'0'):''));
+  return true;
+}
+function renderPro(){ renderRisk(); renderZoneSel(); renderZone(); renderMargin(); }
+
 /* ================= 低庫存 / 叫貨清單 ================= */
 let orderList = [];
 try{ orderList = JSON.parse(localStorage.getItem('pos-order')||'[]'); }catch(e){ orderList=[]; }
@@ -1713,12 +1970,13 @@ function renderBuy(){
       }).join('') + (shown.length>80?`<p class="muted center" style="padding:8px 0">…還有 ${shown.length-80} 筆</p>`:'')
     : '<p class="muted center" style="padding:12px 0">目前沒有庫存偏低的商品 ✨</p>';
   // 叫貨清單
+  const og = orderByVendor();
   document.getElementById('orderList').innerHTML = orderList.length
-    ? orderList.map(o=>`<div class="rec-batch" style="grid-template-columns:1fr 70px auto">
+    ? Object.keys(og).map(v=>`<p class="muted" style="margin:10px 0 4px;font-weight:700;color:var(--brand-dk)">🏭 ${esc(v)}(${og[v].length})</p>` + og[v].map(o=>`<div class="rec-batch" style="grid-template-columns:1fr 70px auto">
         <span><b>${esc(o.name)}</b><br><span class="muted" style="font-size:12px">${o.shelf?'📍'+esc(o.shelf)+'｜':''}目前 ${o.qty} ${esc(o.unit||'')}</span></span>
         <input type="number" inputmode="numeric" value="${o.orderQty||''}" placeholder="數量" onchange="setOrderQty('${o.pid}', this.value)" style="padding:6px;font-size:14px">
         <button class="btn-sm btn-danger" onclick="toggleOrder('${o.pid}')">移除</button>
-      </div>`).join('')
+      </div>`).join('')).join('')
     : '<p class="muted center" style="padding:12px 0">清單是空的。在上方低庫存清單按「＋叫貨」加入,<br>或掃描商品時按「加入叫貨」</p>';
 }
 function orderCurrent(){
@@ -1748,21 +2006,44 @@ function clearOrder(){
   if(!confirm('清空叫貨清單?')) return;
   orderList=[]; saveOrder(); renderBuy();
 }
+function orderByVendor(){
+  const g = {};
+  for(const o of orderList){
+    const p = DB.find(x=>x.id===o.pid) || {};
+    const v = (p.vendor||'').trim() || '未指定廠商';
+    (g[v] = g[v]||[]).push(Object.assign({}, o, {vendor:v}));
+  }
+  return g;
+}
 function exportOrder(){
   if(!orderList.length){ toast('叫貨清單是空的'); return; }
   const wb = XLSX.utils.book_new();
+  const g = orderByVendor();
+  // 每個廠商一張工作表
+  for(const v of Object.keys(g)){
+    const safe = v.replace(/[\\\/\?\*\[\]:]/g,'_').slice(0,28);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(g[v].map(o=>({
+      '品名':o.name,'分類':o.cat,'貨架':o.shelf,'目前庫存':o.qty,'單位':o.unit,'叫貨數量':o.orderQty||''
+    }))), safe);
+  }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(orderList.map(o=>({
-    '品名':o.name,'分類':o.cat,'貨架':o.shelf,'目前庫存':o.qty,'單位':o.unit,'叫貨數量':o.orderQty||''
-  }))), '叫貨單');
+    '品名':o.name,'廠商':(DB.find(x=>x.id===o.pid)||{}).vendor||'','分類':o.cat,'貨架':o.shelf,
+    '目前庫存':o.qty,'單位':o.unit,'叫貨數量':o.orderQty||''
+  }))), '全部彙總');
   const d=new Date();
   saveWorkbook(wb, `叫貨單_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
 }
 function printOrder(){
   if(!orderList.length){ toast('叫貨清單是空的'); return; }
   const d = new Date().toLocaleDateString('zh-TW');
-  const rows = orderList.map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.name)}</td><td>${esc(o.unit||'')}</td><td>${o.qty}</td><td><b>${o.orderQty||''}</b></td></tr>`).join('');
-  openPrint(`<h1>叫貨單</h1><p>日期:${d}　共 ${orderList.length} 項</p>
-    <table><thead><tr><th>#</th><th>品名</th><th>單位</th><th>目前庫存</th><th>叫貨數量</th></tr></thead><tbody>${rows}</tbody></table>`);
+  const g = orderByVendor();
+  const html = Object.keys(g).map((v,idx)=>{
+    const rows = g[v].map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.name)}</td><td>${esc(o.unit||'')}</td><td>${o.qty}</td><td><b>${o.orderQty||''}</b></td></tr>`).join('');
+    return `<div style="${idx?'page-break-before:always;padding-top:10px;':''}">
+      <h1>叫貨單 — ${esc(v)}</h1><p>日期:${d}　共 ${g[v].length} 項</p>
+      <table><thead><tr><th>#</th><th>品名</th><th>單位</th><th>目前庫存</th><th>叫貨數量</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }).join('');
+  openPrint(html);
 }
 
 /* ================= 列印工具 ================= */
@@ -1888,7 +2169,7 @@ function renderToday(){
 
 /* ================= 效期警示 ================= */
 // 品項客製規則:名稱含關鍵字者,僅在指定天數內才提醒(已過期仍會提醒)
-const ALERT_RULES = []; // 可加入品項客製規則,例:{match:'品牌名', maxDays:31}
+const ALERT_RULES = [];
 const TIERS = [
   {key:'past', label:'已過期',  chip:'tc-past', cls:'al-past', color:'#b3261e'},
   {key:'m1',   label:'1個月內', chip:'tc-m1',   cls:'al-m1',   color:'#e65100'},

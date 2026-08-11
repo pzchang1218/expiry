@@ -250,7 +250,7 @@ body.dark .seg{background:#0b100f;}
   <h1>💊 效期盤點小幫手<span id="cloudDot" style="margin-left:auto;font-size:15px;opacity:.9;cursor:pointer" onclick="gotoData()" title="雲端同步狀態"></span><button onclick="gotoData()" style="margin-left:6px" title="備份 / 還原 / 同步" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">💾</button><button id="themeBtn" onclick="toggleTheme()" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">🌙</button></h1>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.6</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.7</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -449,7 +449,8 @@ body.dark .seg{background:#0b100f;}
       <button class="btn-main" style="margin-top:10px" onclick="exportXlsx()">⬇️ 匯出盤點結果 Excel</button>
       <button class="btn-ghost" style="margin-top:10px" onclick="reUpload()">🔄 從 POS 更新商品主檔</button>
       <p class="hint">匯入 POS 匯出的 Excel 時,只更新名稱/條碼/單位,<br><b>庫存以 App 的實盤為準不會被覆蓋</b>,貨架、分類、廠商、價格與標記也完整保留。<br>(新品項的庫存則會帶入 POS 的數字)</p>
-      <button class="btn-ghost" style="margin-top:10px" onclick="restoreBuiltin()">♻️ 還原內建商品資料(4,968 筆)</button>
+      <button class="btn-ghost" style="margin-top:10px" onclick="restoreBuiltin()">♻️ 還原內建商品資料</button>
+      <button class="btn-ghost" style="margin-top:10px" onclick="forceSeed()">🔄 重新補上內建廠商/分類資料</button>
     </div>
 
     <div class="card" id="dataCard" style="border:2px solid var(--brand)">
@@ -857,7 +858,10 @@ async function sSet(k,v){
 /* ================= 初始化 ================= */
 window.addEventListener('load', async ()=>{
   const raw = await sGet('pos-products');
-  if(raw){ loadDB(JSON.parse(raw)); }
+  if(raw){
+    loadDB(JSON.parse(raw));
+    await seedFromEmbedded();            // 把內建主檔的「新增欄位」補進本機既有資料
+  }
   else if(EMBEDDED_DB.length){ loadDB(EMBEDDED_DB); } // 首次開啟直接用內建主檔
   const rr = await sGet('pos-records');
   if(rr){ records = JSON.parse(rr); }
@@ -2002,6 +2006,12 @@ async function clearAll(){
   await sSet('pos-records','[]');
   renderRecords(); refreshAll();
   toast('已清空盤點記錄');
+}
+async function forceSeed(){
+  try{ localStorage.removeItem('pos-seed-ver'); }catch(e){}
+  await seedFromEmbedded();
+  refreshAll(); renderRecords(); renderAlert();
+  toast('✓ 已重新比對內建資料');
 }
 async function restoreBuiltin(){
   if(!EMBEDDED_DB.length){ toast('此版本沒有內建資料'); return; }
@@ -3177,6 +3187,34 @@ async function afterStockIn(prod, qty){
     }
   }
   toast(`📥 已入庫 ${qty} ${prod.unit||''},庫存 ${book} → ${prod.stock}`);
+}
+
+/* 內建主檔升級:本機已有資料時,補上內建版新增的欄位(例如廠商),不覆蓋使用者自己填的 */
+const SEED_VER = 'v6.4-vendor';
+async function seedFromEmbedded(){
+  if(typeof EMBEDDED_DB === 'undefined' || !EMBEDDED_DB.length) return;
+  let done = ''; try{ done = localStorage.getItem('pos-seed-ver')||''; }catch(e){}
+  if(done === SEED_VER) return;
+  const byId = {}; DB.forEach(p=>byId[p.id]=p);
+  const FILL = ['vendor','vendorAlt','cat','shelf','minQty','price','sale','flags','life','unit','bc1','bc2'];
+  let added = 0, filled = 0;
+  for(const e of EMBEDDED_DB){
+    const cur = byId[e.id];
+    if(!cur){ DB.push(e); byId[e.id]=e; added++; continue; }
+    for(const k of FILL){
+      const v = e[k];
+      const empty = cur[k]===undefined || cur[k]==='' || (Array.isArray(cur[k]) && !cur[k].length);
+      if(empty && v!==undefined && v!=='' && !(Array.isArray(v) && !v.length)){ cur[k]=v; filled++; }
+    }
+  }
+  if(added || filled){
+    loadDB(DB);
+    await sSet('pos-products', JSON.stringify(DB));
+  }
+  try{ localStorage.setItem('pos-seed-ver', SEED_VER); }catch(e){}
+  if(filled || added){
+    setTimeout(()=>toast(`✓ 已補上內建資料:新增 ${added} 品項、補齊 ${filled} 個欄位`), 1200);
+  }
 }
 
 /* ================= 顧客代訂 / 慢箋回領 ================= */

@@ -250,7 +250,7 @@ body.dark .seg{background:#0b100f;}
   <h1>💊 效期盤點小幫手<span id="cloudDot" style="margin-left:auto;font-size:15px;opacity:.9;cursor:pointer" onclick="gotoData()" title="雲端同步狀態"></span><button onclick="gotoData()" style="margin-left:6px" title="備份 / 還原 / 同步" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">💾</button><button id="themeBtn" onclick="toggleTheme()" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">🌙</button></h1>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.5</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.6</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -366,6 +366,7 @@ body.dark .seg{background:#0b100f;}
           <button class="btn-sm btn-line" onclick="editProduct()">✏️ 編輯品項</button>
           <button class="btn-sm btn-line" id="btnOrder" onclick="orderCurrent()">🛒 加入叫貨清單</button>
           <button class="btn-sm btn-line" onclick="syncStockFromCount()">📊 用實盤數更新帳面庫存</button>
+          <button class="btn-sm btn-line" onclick="custFromProduct()">🙋 幫顧客代訂此商品</button>
         </div>
       </div>
       <div id="stockInBar" class="hidden" style="background:#e3f2fd;border:2px solid #1565c0;color:#0d47a1;border-radius:12px;padding:10px;margin-bottom:10px;font-size:13.5px;line-height:1.7"></div>
@@ -572,6 +573,66 @@ body.dark .seg{background:#0b100f;}
     </div>
   </section>
 
+  <!-- ============ 顧客服務(代訂 / 慢箋回領) ============ -->
+  <section id="viewCust" class="hidden">
+    <div class="stat-row">
+      <div class="stat"><div class="num" id="cDue">0</div><div class="lbl">今日該聯絡</div></div>
+      <div class="stat"><div class="num" id="cOrder">0</div><div class="lbl">代訂中</div></div>
+      <div class="stat"><div class="num" id="cRx">0</div><div class="lbl">慢箋追蹤</div></div>
+    </div>
+
+    <div class="note" style="margin-bottom:12px">
+      🔒 <b>個資最小化原則</b>:只登記稱呼與電話,<b>請勿</b>填入身分證、病歷號或診斷內容。<br>
+      留存顧客電話做提醒前,請先向顧客說明用途並取得同意。
+    </div>
+
+    <div class="card">
+      <h2>➕ 新 增 登 記</h2>
+      <div class="row2">
+        <div><label>類型</label><select id="cvType" onchange="onCustTypeChange()">
+          <option value="order">📝 顧客代訂 / 缺貨登記</option>
+          <option value="rx">💊 慢箋回領提醒</option>
+        </select></div>
+        <div><label>稱呼(建議用姓氏+先生/小姐)</label><input id="cvName" placeholder="例:陳小姐" autocomplete="off"></div>
+      </div>
+      <div class="row2">
+        <div><label>聯絡電話</label><input id="cvTel" type="tel" inputmode="tel" placeholder="0912xxxxxx" autocomplete="off"></div>
+        <div><label id="cvQtyLabel">數量</label><input id="cvQty" type="number" inputmode="numeric" placeholder="1"></div>
+      </div>
+      <label id="cvItemLabel">商品(可留空自行輸入)</label>
+      <input id="cvItem" placeholder="輸入商品名稱,或先到掃描頁掃碼後回來" autocomplete="off">
+      <div class="row2">
+        <div><label id="cvDateLabel">預計到貨 / 通知日</label><input id="cvDate" type="date"></div>
+        <div id="cvIntervalWrap" class="hidden"><label>回領間隔(天)</label><input id="cvInterval" type="number" inputmode="numeric" value="28"></div>
+      </div>
+      <label>備註</label>
+      <input id="cvNote" placeholder="例:要無糖的、下次順便帶血壓紀錄" autocomplete="off">
+      <div class="row2" style="margin-top:14px">
+        <button class="btn-line" style="padding:12px" onclick="resetCustForm()">清空</button>
+        <button class="btn-main" style="padding:12px" onclick="saveCust()">✓ 登記</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📋 追 蹤 清 單</h2>
+      <div class="seg">
+        <button id="cfAll" class="on" onclick="setCustFilter('all')">全部</button>
+        <button id="cfDue" onclick="setCustFilter('due')">該聯絡</button>
+        <button id="cfOrder" onclick="setCustFilter('order')">代訂</button>
+        <button id="cfRx" onclick="setCustFilter('rx')">慢箋</button>
+      </div>
+      <input id="cSearch" placeholder="🔍 搜尋稱呼 / 商品 / 電話" oninput="renderCustList()" style="margin-top:8px">
+      <div id="custList"></div>
+    </div>
+
+    <div class="card">
+      <h2>✅ 已 完 成</h2>
+      <details><summary style="cursor:pointer;font-size:14px;color:var(--brand-dk);font-weight:700">查看已完成紀錄(<span id="cDoneCount">0</span>)</summary>
+        <div id="custDone"></div></details>
+      <button class="btn-ghost" style="margin-top:10px" onclick="exportCust()">⬇️ 匯出顧客追蹤清單</button>
+    </div>
+  </section>
+
   <!-- ============ 分析(風險預警 / 分區盤點 / 毛利) ============ -->
   <section id="viewPro" class="hidden">
     <div class="card" style="border:2px solid #b3261e">
@@ -706,6 +767,7 @@ body.dark .seg{background:#0b100f;}
   <button id="tabAlert" onclick="showView('alert')"><span class="ico">⏰</span>效期警示</button>
   <button id="tabRec" onclick="showView('records')"><span class="ico">📋</span>盤點記錄</button>
   <button id="tabBuy" onclick="showView('buy')"><span class="ico">🛒</span>補貨叫貨</button>
+  <button id="tabCust" onclick="showView('cust')"><span class="ico">🙋</span>顧客</button>
   <button id="tabPro" onclick="showView('pro')"><span class="ico">🔮</span>分析</button>
 </nav>
 
@@ -943,16 +1005,19 @@ function showView(v){
   document.getElementById('viewAlert').classList.toggle('hidden', v!=='alert');
   document.getElementById('viewBuy').classList.toggle('hidden', v!=='buy');
   document.getElementById('viewPro').classList.toggle('hidden', v!=='pro');
+  document.getElementById('viewCust').classList.toggle('hidden', v!=='cust');
   document.getElementById('tabScan').classList.toggle('active', v==='scan');
   document.getElementById('tabRec').classList.toggle('active', v==='records');
   document.getElementById('tabAlert').classList.toggle('active', v==='alert');
   document.getElementById('tabBuy').classList.toggle('active', v==='buy');
   document.getElementById('tabPro').classList.toggle('active', v==='pro');
+  document.getElementById('tabCust').classList.toggle('active', v==='cust');
   if(v==='scan'){ renderToday(); }
   if(v==='records'){ renderRecords(); stopCam(); }
   if(v==='alert'){ renderAlert(); stopCam(); }
   if(v==='buy'){ renderBuy(); renderStale(); renderVendors(); renderAssignList(); renderReturns(); stopCam(); }
   if(v==='pro'){ renderPro(); stopCam(); }
+  if(v==='cust'){ renderCust(); stopCam(); }
 }
 
 /* ================= 相機掃描 ================= */
@@ -2207,7 +2272,8 @@ async function cloudPush(manual){
     await fsPut('extras', {trash:trash,
       recallLog:(typeof recallLog!=='undefined'?recallLog:[]),
       orderList:(typeof orderList!=='undefined'?orderList:[]), returnList:(typeof returnList!=='undefined'?returnList:[]),
-      vendors:(typeof vendors!=='undefined'?vendors:{}), operators:(typeof operators!=='undefined'?operators:[]),
+      vendors:(typeof vendors!=='undefined'?vendors:{}), custs:(typeof custs!=='undefined'?custs:[]),
+      operators:(typeof operators!=='undefined'?operators:[]),
       zoneOwners:(typeof zoneOwners!=='undefined'?zoneOwners:{}),
       settings:{lowTh:S('pos-low-th'), incZero:S('pos-inc-zero')}});
     try{ localStorage.setItem('pos-cloud-last', String(Date.now())); }catch(e){}
@@ -2331,6 +2397,17 @@ function restoreExtras(d, mergeMode){
       recallLog.sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
       put('pos-recall-log', JSON.stringify(recallLog));
     }
+    // 顧客追蹤(依 id 去重,取較新)
+    if(Array.isArray(d.custs)){
+      if(typeof custs==='undefined') custs = [];
+      const byId = {}; custs.forEach(c=>byId[c.id]=c);
+      for(const c of d.custs){
+        const cur = byId[c.id];
+        if(!cur){ custs.push(c); byId[c.id]=c; }
+        else if((c.upd||0) > (cur.upd||0)) Object.assign(cur, c);
+      }
+      put('pos-custs', JSON.stringify(custs));
+    }
     // 退貨清單
     if(Array.isArray(d.returnList)){
       if(typeof returnList==='undefined') returnList = [];
@@ -2441,6 +2518,7 @@ function backupData(){
                    recallLog:(typeof recallLog!=='undefined'?recallLog:[]),
                    orderList:(typeof orderList!=='undefined'?orderList:[]),
                    returnList:(typeof returnList!=='undefined'?returnList:[]),
+                   custs:(typeof custs!=='undefined'?custs:[]),
                    vendors:(typeof vendors!=='undefined'?vendors:{}),
                    operators:(typeof operators!=='undefined'?operators:[]),
                    zoneOwners:(typeof zoneOwners!=='undefined'?zoneOwners:{}),
@@ -3101,6 +3179,196 @@ async function afterStockIn(prod, qty){
   toast(`📥 已入庫 ${qty} ${prod.unit||''},庫存 ${book} → ${prod.stock}`);
 }
 
+/* ================= 顧客代訂 / 慢箋回領 ================= */
+let custs = [];
+try{ custs = JSON.parse(localStorage.getItem('pos-custs')||'[]'); }catch(e){ custs = []; }
+function saveCusts(){ try{ localStorage.setItem('pos-custs', JSON.stringify(custs)); }catch(e){} }
+let custFilter = 'all', custEditId = null;
+
+function todayStr(){
+  const d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function daysTo(dateStr){
+  if(!dateStr) return null;
+  const m = String(dateStr).match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if(!m) return null;
+  const t = new Date(+m[1], +m[2]-1, +m[3]); t.setHours(0,0,0,0);
+  const n = new Date(); n.setHours(0,0,0,0);
+  return Math.round((t-n)/86400000);
+}
+function onCustTypeChange(){
+  const rx = document.getElementById('cvType').value === 'rx';
+  document.getElementById('cvIntervalWrap').classList.toggle('hidden', !rx);
+  document.getElementById('cvDateLabel').textContent = rx ? '下次可領日' : '預計到貨 / 通知日';
+  document.getElementById('cvItemLabel').textContent = rx ? '藥品(僅記品名,勿填診斷)' : '商品(可留空自行輸入)';
+  document.getElementById('cvQtyLabel').textContent = rx ? '天數 / 數量' : '數量';
+}
+function resetCustForm(){
+  custEditId = null;
+  ['cvName','cvTel','cvItem','cvNote','cvQty'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('cvDate').value = '';
+  onCustTypeChange();
+}
+async function saveCust(){
+  const name = document.getElementById('cvName').value.trim();
+  const tel  = document.getElementById('cvTel').value.trim();
+  const item = document.getElementById('cvItem').value.trim();
+  if(!name && !tel){ toast('請至少填稱呼或電話'); return; }
+  if(!item){ toast('請填商品/藥品名稱'); return; }
+  const type = document.getElementById('cvType').value;
+  const obj = {
+    id: custEditId || ('c'+Date.now()+Math.random().toString(36).slice(2,5)),
+    type, name, tel, item,
+    qty: document.getElementById('cvQty').value.trim(),
+    date: document.getElementById('cvDate').value || '',
+    interval: type==='rx' ? (document.getElementById('cvInterval').value.trim()||'28') : '',
+    note: document.getElementById('cvNote').value.trim(),
+    by: currentOp, ts: new Date().toLocaleString('zh-TW',{hour12:false}),
+    done: false, upd: Date.now()
+  };
+  if(custEditId){
+    const i = custs.findIndex(c=>c.id===custEditId);
+    if(i>=0) custs[i] = Object.assign(custs[i], obj);
+    toast('✓ 已更新');
+  }else{ custs.push(obj); toast('✓ 已登記'); }
+  saveCusts(); resetCustForm(); renderCust(); renderToday();
+}
+function editCust(id){
+  const c = custs.find(x=>x.id===id); if(!c) return;
+  custEditId = id;
+  document.getElementById('cvType').value = c.type;
+  document.getElementById('cvName').value = c.name||'';
+  document.getElementById('cvTel').value = c.tel||'';
+  document.getElementById('cvItem').value = c.item||'';
+  document.getElementById('cvQty').value = c.qty||'';
+  document.getElementById('cvDate').value = c.date||'';
+  document.getElementById('cvInterval').value = c.interval||'28';
+  document.getElementById('cvNote').value = c.note||'';
+  onCustTypeChange();
+  window.scrollTo({top:0, behavior:'smooth'});
+  toast('編輯中,改完按「✓ 登記」儲存');
+}
+async function custArrived(id){
+  const c = custs.find(x=>x.id===id); if(!c) return;
+  if(!confirm(`「${c.item}」已到貨,要標記為已通知顧客並完成嗎?`)) return;
+  c.done = true; c.doneTs = new Date().toLocaleString('zh-TW',{hour12:false});
+  c.doneBy = currentOp; c.upd = Date.now();
+  saveCusts(); renderCust(); renderToday();
+  toast('✓ 已完成');
+}
+async function custRenew(id){
+  const c = custs.find(x=>x.id===id); if(!c) return;
+  const n = parseInt(c.interval||'28',10) || 28;
+  const base = c.date ? new Date(c.date) : new Date();
+  base.setDate(base.getDate() + n);
+  const next = base.getFullYear()+'-'+String(base.getMonth()+1).padStart(2,'0')+'-'+String(base.getDate()).padStart(2,'0');
+  if(!confirm(`「${c.name}」已回領。\n下次可領日順延至 ${next}?`)) return;
+  c.date = next; c.lastTaken = todayStr(); c.times = (Number(c.times)||0)+1; c.upd = Date.now();
+  saveCusts(); renderCust(); renderToday();
+  toast(`✓ 已記錄,下次 ${next}`);
+}
+async function delCust(id){
+  const c = custs.find(x=>x.id===id); if(!c) return;
+  if(!confirm(`刪除「${c.name} - ${c.item}」的登記?`)) return;
+  custs = custs.filter(x=>x.id!==id);
+  saveCusts(); renderCust(); renderToday();
+  toast('已刪除');
+}
+function custDueList(){
+  return custs.filter(c=>{
+    if(c.done) return false;
+    const d = daysTo(c.date);
+    return d !== null && d <= 0;
+  });
+}
+function setCustFilter(f){
+  custFilter = f;
+  ['All','Due','Order','Rx'].forEach(x=>{
+    const el = document.getElementById('cf'+x);
+    if(el) el.classList.toggle('on', custFilter === x.toLowerCase());
+  });
+  renderCustList();
+}
+function renderCustList(){
+  const q = (document.getElementById('cSearch').value||'').trim().toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  let list = custs.filter(c=>!c.done);
+  if(custFilter==='due') list = custDueList();
+  else if(custFilter==='order') list = list.filter(c=>c.type==='order');
+  else if(custFilter==='rx') list = list.filter(c=>c.type==='rx');
+  if(terms.length) list = list.filter(c=>terms.every(t=>((c.name||'')+' '+(c.item||'')+' '+(c.tel||'')+' '+(c.note||'')).toLowerCase().includes(t)));
+  list.sort((a,b)=>{
+    const da = daysTo(a.date), db = daysTo(b.date);
+    if(da===null && db===null) return 0;
+    if(da===null) return 1;
+    if(db===null) return -1;
+    return da-db;
+  });
+  document.getElementById('custList').innerHTML = list.length
+    ? list.map(c=>{
+        const d = daysTo(c.date);
+        const due = d !== null && d <= 0;
+        const soon = d !== null && d > 0 && d <= 3;
+        const cls = due ? 'al-past' : (soon ? 'al-m1' : 'al-m6');
+        const when = d===null ? '未設日期'
+          : d < 0 ? `已逾期 ${-d} 天` : d === 0 ? '就是今天' : `還有 ${d} 天`;
+        return `<div class="alert-item ${cls}">
+          <div class="nm">${c.type==='rx'?'💊':'📝'} ${esc(c.name||'(未填稱呼)')}
+            <span class="badge" style="background:${due?'#b3261e':(soon?'#e65100':'#0f8a6d')}">${when}</span></div>
+          <div class="dt">${esc(c.item)}${c.qty?' × '+esc(c.qty):''}
+            ${c.date?'｜'+esc(c.date):''}${c.type==='rx'&&c.times?`｜已回領 ${c.times} 次`:''}
+            ${c.tel?'<br>📞 '+esc(c.tel):''}${c.note?'<br>📌 '+esc(c.note):''}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            ${c.tel?`<a class="btn-sm btn-line" style="text-decoration:none;display:inline-block" href="tel:${esc(c.tel)}">📞 撥號</a>
+                    <a class="btn-sm btn-line" style="text-decoration:none;display:inline-block" href="sms:${esc(c.tel)}?body=${encodeURIComponent(custMsg(c))}">💬 簡訊</a>`:''}
+            ${c.type==='rx'
+              ? `<button class="btn-sm btn-line" onclick="custRenew('${c.id}')">💊 已回領・順延</button>`
+              : `<button class="btn-sm btn-line" onclick="custArrived('${c.id}')">📦 已到貨・完成</button>`}
+            <button class="btn-sm btn-line" onclick="editCust('${c.id}')">✏️ 修改</button>
+            <button class="btn-sm btn-danger" onclick="delCust('${c.id}')">刪除</button>
+          </div></div>`;
+      }).join('')
+    : '<p class="muted center" style="padding:14px 0">目前沒有待辦的顧客登記 ✨</p>';
+}
+function custMsg(c){
+  return c.type==='rx'
+    ? `${c.name||''}您好,這裡是藥局。提醒您的慢性處方箋(${c.item})可於 ${c.date||''} 起領取,歡迎來店。`
+    : `${c.name||''}您好,這裡是藥局。您訂購的「${c.item}」已到貨,歡迎來店取貨,謝謝。`;
+}
+function renderCust(){
+  document.getElementById('cDue').textContent = custDueList().length;
+  document.getElementById('cOrder').textContent = custs.filter(c=>!c.done && c.type==='order').length;
+  document.getElementById('cRx').textContent = custs.filter(c=>!c.done && c.type==='rx').length;
+  renderCustList();
+  const done = custs.filter(c=>c.done);
+  document.getElementById('cDoneCount').textContent = done.length;
+  document.getElementById('custDone').innerHTML = done.length
+    ? done.slice(-50).reverse().map(c=>`<div class="rec-batch" style="grid-template-columns:1fr auto">
+        <span>${c.type==='rx'?'💊':'📝'} ${esc(c.name||'')}｜${esc(c.item)}<br>
+          <span class="muted" style="font-size:12px">${esc(c.doneTs||'')}${c.doneBy?'｜'+esc(c.doneBy):''}</span></span>
+        <button class="btn-sm btn-line" onclick="custReopen('${c.id}')">復原</button></div>`).join('')
+    : '<p class="muted center" style="padding:10px 0">尚無已完成紀錄</p>';
+}
+async function custReopen(id){
+  const c = custs.find(x=>x.id===id); if(!c) return;
+  c.done = false; delete c.doneTs; c.upd = Date.now();
+  saveCusts(); renderCust();
+  toast('已復原為待辦');
+}
+function exportCust(){
+  if(!custs.length){ toast('沒有資料可匯出'); return; }
+  const TY = {order:'顧客代訂', rx:'慢箋回領'};
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(custs.map(c=>({
+    '類型':TY[c.type]||c.type,'稱呼':c.name,'電話':c.tel,'品項':c.item,'數量':c.qty,
+    '預定日':c.date,'回領間隔':c.interval,'已回領次數':c.times||'','備註':c.note,
+    '狀態':c.done?'已完成':'追蹤中','登記時間':c.ts,'登記人':c.by||''
+  }))), '顧客追蹤');
+  const d=new Date();
+  saveWorkbook(wb, `顧客追蹤_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+
 /* ================= 退貨清單 ================= */
 let returnList = [];
 try{ returnList = JSON.parse(localStorage.getItem('pos-returns')||'[]'); }catch(e){ returnList = []; }
@@ -3408,6 +3676,17 @@ async function syncStockFromCount(){
   const i = DB.indexOf(currentProd);
   openForm(i); refreshAll(); renderToday();
   toast('✓ 帳面庫存已更新為 '+counted);
+}
+function custFromProduct(){
+  if(!currentProd) return;
+  showView('cust');
+  setTimeout(()=>{
+    resetCustForm();
+    document.getElementById('cvType').value='order'; onCustTypeChange();
+    document.getElementById('cvItem').value = currentProd.name;
+    document.getElementById('cvName').focus();
+    toast('已帶入商品,請填顧客資訊');
+  }, 120);
 }
 function orderCurrent(){
   if(!currentProd) return;
@@ -3840,6 +4119,10 @@ function renderToday(){
   if(a.m1.length) items.push(`<b style="font-size:18px">${a.m1.length}</b> 件一個月內到期`);
   if(low) items.push(`<b style="font-size:18px">${low}</b> 件庫存偏低`);
   if(typeof returnList!=='undefined' && returnList.length) items.push(`<b style="font-size:18px">${returnList.length}</b> 批待退貨`);
+  if(typeof custDueList==='function'){
+    const cd = custDueList().length;
+    if(cd) items.push(`<b style="font-size:18px">${cd}</b> 位顧客該聯絡了`);
+  }
   box.innerHTML = items.length
     ? '<div style="line-height:2">' + items.map(t=>'· '+t).join('<br>') + '</div>'
       + `<button class="btn-sm" style="margin-top:10px;background:rgba(255,255,255,.22);color:#fff" onclick="showView('alert')">前往處理 →</button>`

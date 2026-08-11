@@ -254,7 +254,7 @@ body.dark .seg{background:#0b100f;}
   <h1>💊 效期盤點小幫手<span id="cloudDot" style="margin-left:auto;font-size:15px;opacity:.9;cursor:pointer" onclick="gotoData()" title="雲端同步狀態"></span><button onclick="gotoData()" style="margin-left:6px" title="備份 / 還原 / 同步" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">💾</button><button id="themeBtn" onclick="toggleTheme()" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">🌙</button></h1>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.8</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.9</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -640,6 +640,37 @@ body.dark .seg{background:#0b100f;}
 
   <!-- ============ 分析(風險預警 / 分區盤點 / 毛利) ============ -->
   <section id="viewPro" class="hidden">
+    <div class="card">
+      <h2>📈 趨 勢 圖(近 12 個月)</h2>
+      <div class="seg">
+        <button id="tgLoss" class="on" onclick="setTrend('loss')">損失金額</button>
+        <button id="tgDone" onclick="setTrend('done')">結案筆數</button>
+        <button id="tgScan" onclick="setTrend('scan')">登記批次</button>
+      </div>
+      <div id="trendChart"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔍 損 耗 原 因 分 析</h2>
+      <div id="lossBox"></div>
+    </div>
+
+    <div class="card">
+      <h2>🎪 促 銷 檔 期</h2>
+      <div id="campBox"></div>
+      <div class="row2" style="margin-top:10px">
+        <button class="btn-ghost" onclick="newCampaign()">➕ 建立新檔期</button>
+        <button class="btn-ghost" onclick="exportCamp()">⬇️ 匯出成效</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📸 盤 點 快 照</h2>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">存下當下的庫存狀態,日後可比較兩次之間哪些品項變化最大</p>
+      <button class="btn-main" onclick="takeSnapshot()">📸 建立此刻的快照</button>
+      <div id="snapBox"></div>
+    </div>
+
     <div class="card" style="border:2px solid #b3261e">
       <h2 style="color:#b3261e">🚨 藥品回收批號比對</h2>
       <p class="muted" style="margin:0 0 8px;font-size:13px">收到公會/食藥署回收公文時,貼上品名與批號,立刻查出店裡有沒有這批貨</p>
@@ -2287,6 +2318,7 @@ async function cloudPush(manual){
       recallLog:(typeof recallLog!=='undefined'?recallLog:[]),
       orderList:(typeof orderList!=='undefined'?orderList:[]), returnList:(typeof returnList!=='undefined'?returnList:[]),
       vendors:(typeof vendors!=='undefined'?vendors:{}), custs:(typeof custs!=='undefined'?custs:[]),
+      camps:(typeof camps!=='undefined'?camps:[]), snaps:(typeof snaps!=='undefined'?snaps:[]),
       operators:(typeof operators!=='undefined'?operators:[]),
       zoneOwners:(typeof zoneOwners!=='undefined'?zoneOwners:{}),
       settings:{lowTh:S('pos-low-th'), incZero:S('pos-inc-zero')}});
@@ -2411,6 +2443,20 @@ function restoreExtras(d, mergeMode){
       recallLog.sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
       put('pos-recall-log', JSON.stringify(recallLog));
     }
+    // 促銷檔期 / 快照
+    if(Array.isArray(d.camps)){
+      if(typeof camps==='undefined') camps = [];
+      const seen = new Set(camps.map(c=>c.id));
+      for(const c of d.camps) if(!seen.has(c.id)){ camps.push(c); seen.add(c.id); }
+      put('pos-camps', JSON.stringify(camps));
+    }
+    if(Array.isArray(d.snaps)){
+      if(typeof snaps==='undefined') snaps = [];
+      const seen = new Set(snaps.map(s=>s.id));
+      for(const s of d.snaps) if(!seen.has(s.id)){ snaps.push(s); seen.add(s.id); }
+      snaps.sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
+      put('pos-snaps', JSON.stringify(snaps.slice(0,24)));
+    }
     // 顧客追蹤(依 id 去重,取較新)
     if(Array.isArray(d.custs)){
       if(typeof custs==='undefined') custs = [];
@@ -2533,6 +2579,8 @@ function backupData(){
                    orderList:(typeof orderList!=='undefined'?orderList:[]),
                    returnList:(typeof returnList!=='undefined'?returnList:[]),
                    custs:(typeof custs!=='undefined'?custs:[]),
+                   camps:(typeof camps!=='undefined'?camps:[]),
+                   snaps:(typeof snaps!=='undefined'?snaps:[]),
                    vendors:(typeof vendors!=='undefined'?vendors:{}),
                    operators:(typeof operators!=='undefined'?operators:[]),
                    zoneOwners:(typeof zoneOwners!=='undefined'?zoneOwners:{}),
@@ -2876,6 +2924,278 @@ function renderZoneTable(){
   }).join('');
 }
 
+function bars(pairs, color){
+  if(!pairs || !pairs.length) return '';
+  const max = Math.max(...pairs.map(p=>p[1])) || 1;
+  const tot = pairs.reduce((s,p)=>s+p[1],0) || 1;
+  return pairs.map(([k,v])=>`<div style="display:grid;grid-template-columns:88px 1fr 62px;gap:8px;align-items:center;margin-bottom:6px;font-size:13px">
+    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</span>
+    <span style="background:var(--bg);border-radius:99px;height:15px;overflow:hidden">
+      <span style="display:block;height:100%;border-radius:99px;width:${Math.max(4, v/max*100)}%;background:${color}"></span></span>
+    <span style="text-align:right;color:var(--ink2);font-size:12px">${v.toLocaleString()}<span style="opacity:.7"> ${Math.round(v/tot*100)}%</span></span>
+  </div>`).join('');
+}
+/* ================= 趨勢圖 ================= */
+let trendMode = 'loss';
+function setTrend(m){
+  trendMode = m;
+  ['loss','done','scan'].forEach(k=>{
+    const el=document.getElementById('tg'+k.charAt(0).toUpperCase()+k.slice(1));
+    if(el) el.classList.toggle('on', k===m);
+  });
+  renderTrend();
+}
+function monthKey(s){
+  const m = String(s||'').match(/(\d{4})[\/-](\d{1,2})/);
+  return m ? `${m[1]}/${String(+m[2]).padStart(2,'0')}` : null;
+}
+function last12(){
+  const out=[]; const d=new Date();
+  for(let i=11;i>=0;i--){ const x=new Date(d.getFullYear(), d.getMonth()-i, 1);
+    out.push(`${x.getFullYear()}/${String(x.getMonth()+1).padStart(2,'0')}`); }
+  return out;
+}
+function renderTrend(){
+  const months = last12();
+  const data = {};
+  months.forEach(m=>data[m]=0);
+  for(const r of records){
+    if(trendMode==='scan'){ const k=monthKey(r.ts); if(k && k in data) data[k]++; }
+    else if(r.done){
+      const k=monthKey(r.doneTs); if(!k || !(k in data)) continue;
+      if(trendMode==='done') data[k]++;
+      else data[k] += Number(r.loss)||0;
+    }
+  }
+  const vals = months.map(m=>data[m]);
+  const max = Math.max(1, ...vals);
+  const unit = trendMode==='loss' ? '元' : '筆';
+  const total = vals.reduce((a,b)=>a+b,0);
+  const color = trendMode==='loss' ? '#b3261e' : (trendMode==='done' ? '#0f8a6d' : '#3b3a6b');
+  const W=700, H=190, pad=30, bw=(W-pad*2)/12;
+  document.getElementById('trendChart').innerHTML =
+    `<p class="muted" style="margin:8px 0 4px">12 個月合計 <b>${total.toLocaleString()}</b> ${unit}</p>` +
+    `<svg viewBox="0 0 ${W} ${H+28}" style="width:100%">
+      <line x1="${pad}" y1="${H}" x2="${W-pad}" y2="${H}" stroke="var(--line)"/>
+      ${months.map((m,i)=>{
+        const v=data[m], hgt=Math.max(v?4:0, v/max*(H-40));
+        const x=pad+i*bw+bw*0.18, w=bw*0.64;
+        return `<rect x="${x}" y="${H-hgt}" width="${w}" height="${hgt}" rx="3" fill="${color}"/>
+          ${v?`<text x="${x+w/2}" y="${H-hgt-5}" font-size="11" fill="var(--ink2)" text-anchor="middle">${v>=10000?(v/1000).toFixed(0)+'k':v}</text>`:''}
+          <text x="${x+w/2}" y="${H+16}" font-size="10" fill="var(--faint)" text-anchor="middle">${m.slice(2).replace('/','/')}</text>`;
+      }).join('')}
+    </svg>`;
+}
+
+/* ================= 損耗原因分析 ================= */
+function lossAnalysis(){
+  const lost = records.filter(r=>r.done && r.doneWay==='expired');
+  const byItem = {}, byCat = {}, byVendor = {};
+  for(const r of lost){
+    const p = DB.find(x=>x.id===r.pid) || {};
+    const amt = Number(r.loss)||0, qty = Number(r.doneQty??r.qty)||0;
+    const k = r.pid+'|'+r.name;
+    byItem[k] = byItem[k] || {name:r.name, pid:r.pid, times:0, qty:0, amt:0, p};
+    byItem[k].times++; byItem[k].qty+=qty; byItem[k].amt+=amt;
+    const c = p.cat||'未分類'; byCat[c]=(byCat[c]||0)+amt;
+    const v = p.vendor||'未指定廠商'; byVendor[v]=(byVendor[v]||0)+amt;
+  }
+  return {lost, items:Object.values(byItem).sort((a,b)=>b.amt-a.amt||b.qty-a.qty), byCat, byVendor};
+}
+function lossReason(it){
+  // 判斷:進太多 / 賣太慢 / 效期太短
+  const rate = consumeRate(it.pid);
+  const life = Number(it.p.life)||0;
+  if(rate !== null && rate > 0){
+    const monthsToSell = it.qty / rate;
+    if(monthsToSell > 6) return {t:'進太多', c:'#b26a00', s:`以月均 ${rate.toFixed(1)} 的速度,這些量要賣 ${Math.round(monthsToSell)} 個月`};
+    return {t:'賣太慢', c:'#7a4b8a', s:`月均只賣 ${rate.toFixed(1)}`};
+  }
+  if(rate === 0) return {t:'完全沒動', c:'#b3261e', s:'期間內沒有消耗紀錄'};
+  if(life && life <= 12) return {t:'效期太短', c:'#1565c0', s:`保存期限僅 ${life} 個月`};
+  return {t:'資料不足', c:'#5d6485', s:'盤點兩次以上才能推估原因'};
+}
+function renderLoss(){
+  const a = lossAnalysis();
+  const box = document.getElementById('lossBox');
+  if(!a.lost.length){
+    box.innerHTML = '<p class="muted" style="padding:6px 0">目前沒有「過期銷燬」的結案紀錄。<br>在效期警示按「✔ 已處理」並選「過期銷燬」後,這裡就會分析損耗原因 📊</p>';
+    return;
+  }
+  const total = a.items.reduce((s,x)=>s+x.amt,0);
+  const catRows = Object.entries(a.byCat).sort((x,y)=>y[1]-x[1]);
+  const venRows = Object.entries(a.byVendor).sort((x,y)=>y[1]-x[1]).slice(0,5);
+  box.innerHTML =
+    `<div class="stat-row" style="margin-top:8px">
+      <div class="stat"><div class="num" style="color:#b3261e">${total.toLocaleString()}</div><div class="lbl">累計損失(元)</div></div>
+      <div class="stat"><div class="num">${a.lost.length}</div><div class="lbl">銷燬批次</div></div>
+      <div class="stat"><div class="num">${a.items.length}</div><div class="lbl">涉及品項</div></div>
+    </div>
+    <p class="muted" style="margin:12px 0 4px;font-weight:700">💸 損失最多的品項</p>` +
+    a.items.slice(0,10).map(x=>{
+      const r = lossReason(x);
+      return `<div class="rec-batch" style="grid-template-columns:1fr auto">
+        <span><b>${esc(x.name)}</b>
+          <span class="badge" style="background:${r.c}">${r.t}</span><br>
+          <span class="muted" style="font-size:12px">銷燬 ${x.times} 次、${x.qty} 件${x.amt?'、損失 '+x.amt.toLocaleString()+' 元':''}<br>${esc(r.s)}</span></span>
+        <span class="cnt">${x.amt?x.amt.toLocaleString():'—'}</span></div>`;
+    }).join('') +
+    (catRows.length ? `<p class="muted" style="margin:12px 0 4px;font-weight:700">🏷️ 依分類</p>` +
+      bars(catRows.map(([k,v])=>[k,Math.round(v)]), 'linear-gradient(90deg,#b3261e,#e57373)') : '') +
+    (venRows.length ? `<p class="muted" style="margin:12px 0 4px;font-weight:700">🏭 依廠商(前 5)</p>` +
+      bars(venRows.map(([k,v])=>[k,Math.round(v)]), 'linear-gradient(90deg,#5d6485,#9aa0bd)') : '') +
+    `<p class="tiny muted" style="margin-top:8px">💡「進太多」→ 下次減少叫貨量;「賣太慢」→ 考慮不再進或改小包裝;「效期太短」→ 少量多次進貨</p>`;
+}
+
+/* ================= 促銷檔期 ================= */
+let camps = [];
+try{ camps = JSON.parse(localStorage.getItem('pos-camps')||'[]'); }catch(e){ camps = []; }
+function saveCamps(){ try{ localStorage.setItem('pos-camps', JSON.stringify(camps)); }catch(e){} }
+function newCampaign(){
+  const name = prompt('檔期名稱', '即期出清 ' + new Date().toLocaleDateString('zh-TW'));
+  if(!name) return;
+  const days = parseInt(prompt('檔期天數', '14')||'14',10) || 14;
+  const a = buildAlerts();
+  let pool = [...a.m1, ...a.m3].filter(r=>Number(r.qty)>0);
+  if(!pool.length) pool = [...a.m1, ...a.m3];   // 數量未登記時仍納入,可在檔期內補填
+  if(!pool.length && !confirm('目前沒有即期品項,仍要建立空檔期嗎?')) return;
+  const end = new Date(); end.setDate(end.getDate()+days);
+  camps.unshift({
+    id:'k'+Date.now(), name, start: todayStr(),
+    end: end.getFullYear()+'-'+String(end.getMonth()+1).padStart(2,'0')+'-'+String(end.getDate()).padStart(2,'0'),
+    items: pool.map(r=>{
+      const p = DB.find(x=>x.id===r.pid)||{};
+      const s = suggestAction({r, p});
+      const m = s.main.match(/^(\d+)\s*折/);
+      const sale = Number(p.sale)||0;
+      return {rid:r.rid, pid:r.pid, name:r.name, unit:r.unit, qty:Number(r.qty)||0,
+        disc: m?m[1]:'', price: sale, special: (m&&sale)?Math.round(sale*Number(m[1])/10):0, sold:0};
+    }),
+    by: currentOp, ts: new Date().toLocaleString('zh-TW',{hour12:false})
+  });
+  saveCamps(); renderCamps();
+  toast(`✓ 已建立檔期,納入 ${pool.length} 項`);
+}
+function setSold(cid, rid, v){
+  const c = camps.find(x=>x.id===cid); if(!c) return;
+  const it = c.items.find(x=>x.rid===rid); if(!it) return;
+  it.sold = Math.max(0, Math.min(it.qty, Number(v)||0));
+  saveCamps(); renderCamps();
+}
+function delCampaign(cid){
+  const c = camps.find(x=>x.id===cid); if(!c) return;
+  if(!confirm(`刪除檔期「${c.name}」?`)) return;
+  camps = camps.filter(x=>x.id!==cid); saveCamps(); renderCamps();
+}
+function campStats(c){
+  const totalQty = c.items.reduce((s,i)=>s+i.qty,0);
+  const sold = c.items.reduce((s,i)=>s+(i.sold||0),0);
+  const revenue = c.items.reduce((s,i)=>s+((i.sold||0)*(i.special||i.price||0)),0);
+  const wouldLose = c.items.reduce((s,i)=>s+((i.sold||0)*(Number((DB.find(x=>x.id===i.pid)||{}).price)||0)),0);
+  return {totalQty, sold, revenue, wouldLose, rate: totalQty?Math.round(sold/totalQty*100):0};
+}
+function renderCamps(){
+  const box = document.getElementById('campBox');
+  if(!box) return;
+  box.innerHTML = camps.length
+    ? camps.map(c=>{
+        const s = campStats(c);
+        const over = daysTo(c.end);
+        return `<div class="rec-group">
+          <div class="rec-head"><span class="nm">🎪 ${esc(c.name)}</span>
+            <span class="cnt">${over===null?'':(over<0?'已結束':'剩 '+over+' 天')}</span></div>
+          <div class="muted" style="font-size:12px">${esc(c.start)} ~ ${esc(c.end)}｜納入 ${c.items.length} 項</div>
+          <div class="stat-row" style="margin-top:8px">
+            <div class="stat"><div class="num">${s.sold}/${s.totalQty}</div><div class="lbl">售出 / 納入</div></div>
+            <div class="stat"><div class="num" style="color:var(--brand-dk)">${s.rate}%</div><div class="lbl">去化率</div></div>
+            <div class="stat"><div class="num" style="color:#b26a00">${s.revenue.toLocaleString()}</div><div class="lbl">回收金額(元)</div></div>
+          </div>
+          <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13px;color:var(--brand-dk)">查看 / 登記售出數量</summary>
+            ${c.items.map(i=>`<div class="rec-batch" style="grid-template-columns:1fr 66px">
+              <span><b>${esc(i.name)}</b><br><span class="muted" style="font-size:12px">
+                納入 ${i.qty} ${esc(i.unit||'')}${i.disc?'｜'+i.disc+' 折':''}${i.special?'｜特價 '+i.special:''}</span></span>
+              <input type="number" inputmode="numeric" value="${i.sold||0}" onchange="setSold('${c.id}','${i.rid}',this.value)" style="padding:6px">
+            </div>`).join('')}
+          </details>
+          <button class="btn-sm btn-danger" style="margin-top:8px" onclick="delCampaign('${c.id}')">刪除檔期</button>
+        </div>`;
+      }).join('')
+    : '<p class="muted center" style="padding:12px 0">尚無檔期。按「➕ 建立新檔期」會自動把即期品和建議折扣帶進來 🎯</p>';
+}
+function exportCamp(){
+  if(!camps.length){ toast('尚無檔期資料'); return; }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(camps.map(c=>{
+    const s = campStats(c);
+    return {'檔期':c.name,'起':c.start,'迄':c.end,'納入品項':c.items.length,
+      '納入數量':s.totalQty,'售出':s.sold,'去化率(%)':s.rate,'回收金額':s.revenue};
+  })), '檔期總覽');
+  const rows=[];
+  for(const c of camps) for(const i of c.items)
+    rows.push({'檔期':c.name,'品名':i.name,'納入數量':i.qty,'折數':i.disc,'特價':i.special,'售出':i.sold||0,
+               '回收金額':(i.sold||0)*(i.special||i.price||0)});
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length?rows:[{'品名':'無資料'}]), '明細');
+  const d=new Date();
+  saveWorkbook(wb, `促銷檔期成效_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+
+/* ================= 盤點快照 ================= */
+let snaps = [];
+try{ snaps = JSON.parse(localStorage.getItem('pos-snaps')||'[]'); }catch(e){ snaps = []; }
+function saveSnaps(){ try{ localStorage.setItem('pos-snaps', JSON.stringify(snaps.slice(0,24))); }catch(e){} }
+function takeSnapshot(){
+  const note = prompt('快照備註(例:8月月底盤點)', new Date().toLocaleDateString('zh-TW')+' 盤點');
+  if(note===null) return;
+  const map = {};
+  for(const r of records){ if(r.done) continue; map[r.pid] = (map[r.pid]||0) + (Number(r.qty)||0); }
+  const a = buildAlerts();
+  snaps.unshift({
+    id:'s'+Date.now(), note, ts:new Date().toLocaleString('zh-TW',{hour12:false}),
+    items:Object.keys(map).length, recs:records.filter(r=>!r.done).length,
+    qty:Object.values(map).reduce((a2,b)=>a2+b,0),
+    past:a.past.length, m1:a.m1.length, map, by:currentOp
+  });
+  saveSnaps(); renderSnaps();
+  toast('📸 已建立快照');
+}
+function delSnap(id){
+  if(!confirm('刪除這份快照?')) return;
+  snaps = snaps.filter(s=>s.id!==id); saveSnaps(); renderSnaps();
+}
+function renderSnaps(){
+  const box = document.getElementById('snapBox');
+  if(!box) return;
+  box.innerHTML = snaps.length
+    ? snaps.map((s,i)=>`<div class="rec-batch" style="grid-template-columns:1fr auto auto">
+        <span><b>${esc(s.note)}</b><br><span class="muted" style="font-size:12px">
+          ${esc(s.ts)}｜${s.items} 品項 / ${s.qty} 件｜過期 ${s.past}、1月內 ${s.m1}</span></span>
+        ${i<snaps.length-1?`<button class="btn-sm btn-line" onclick="compareSnap('${s.id}','${snaps[i+1].id}')">比較前一份</button>`:'<span></span>'}
+        <button class="btn-sm btn-danger" onclick="delSnap('${s.id}')">刪</button>
+      </div>`).join('') + '<div id="snapDiff"></div>'
+    : '<p class="muted center" style="padding:10px 0">尚無快照。建議每次大盤點後建立一份 📸</p><div id="snapDiff"></div>';
+}
+function compareSnap(idA, idB){
+  const A = snaps.find(s=>s.id===idA), B = snaps.find(s=>s.id===idB);
+  if(!A || !B) return;
+  const keys = new Set([...Object.keys(A.map||{}), ...Object.keys(B.map||{})]);
+  const diffs = [];
+  for(const k of keys){
+    const a = A.map[k]||0, b = B.map[k]||0;
+    if(a === b) continue;
+    const p = DB.find(x=>x.id===k) || {};
+    diffs.push({name:p.name||k, unit:p.unit||'', from:b, to:a, d:a-b});
+  }
+  diffs.sort((x,y)=>Math.abs(y.d)-Math.abs(x.d));
+  document.getElementById('snapDiff').innerHTML = diffs.length
+    ? `<p class="muted" style="margin:12px 0 4px;font-weight:700">📊 「${esc(B.note)}」→「${esc(A.note)}」變化最大的品項</p>` +
+      diffs.slice(0,20).map(x=>`<div class="rec-batch" style="grid-template-columns:1fr auto">
+        <span><b>${esc(x.name)}</b><br><span class="muted" style="font-size:12px">${x.from} → ${x.to} ${esc(x.unit)}</span></span>
+        <span class="cnt" style="background:${x.d<0?'#fbe9e7':'var(--brand-lt)'};color:${x.d<0?'#b3261e':'var(--brand-dk)'}">
+          ${x.d>0?'+':''}${x.d}</span></div>`).join('') +
+      `<p class="tiny muted" style="margin-top:6px">減少 = 賣出或損耗;增加 = 進貨。異常大的減少值得追查 🔍</p>`
+    : '<p class="muted" style="padding:8px 0">兩份快照之間沒有數量差異</p>';
+}
+
 /* ================= 進階分析 ================= */
 function dayDiff(a,b){ return Math.round((a-b)/86400000); }
 // 消耗速度:比較同商品前後兩次盤點的數量差,推估每月用量
@@ -3071,7 +3391,7 @@ function applyVoiceDate(text){
   toast('✓ 已填入 '+y+'/'+String(m).padStart(2,'0')+(d?'/'+String(d).padStart(2,'0'):''));
   return true;
 }
-function renderPro(){ renderRisk(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); }
+function renderPro(){ renderTrend(); renderLoss(); renderCamps(); renderSnaps(); renderRisk(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); }
 
 /* ================= 自製條碼(Code128)列印 ================= */
 const C128 = ["11011001100","11001101100","11001100110","10010011000","10010001100","10001001100","10011001000","10011000100","10001100100","11001001000","11001000100","11000100100","10110011100","10011011100","10011001110","10111001100","10011101100","10011100110","11001110010","11001011100","11001001110","11011100100","11001110100","11101101110","11101001100","11100101100","11100100110","11101100100","11100110100","11100110010","11011011000","11011000110","11000110110","10100011000","10001011000","10001000110","10110001000","10001101000","10001100010","11010001000","11000101000","11000100010","10110111000","10110001110","10001101110","10111011000","10111000110","10001110110","11101110110","11010001110","11000101110","11011101000","11011100010","11011101110","11101011000","11101000110","11100010110","11101101000","11101100010","11100011010","11101111010","11001000010","11110001010","10100110000","10100001100","10010110000","10010000110","10000101100","10000100110","10110010000","10110000100","10011010000","10011000010","10000110100","10000110010","11000010010","11001010000","11110111010","11000010100","10001111010","10100111100","10010111100","10010011110","10111100100","10011110100","10011110010","11110100100","11110010100","11110010010","11011011110","11011110110","11110110110","10101111000","10100011110","10001011110","10111101000","10111100010","11110101000","11110100010","10111011110","10111101110","11101011110","11110101110","11010000100","11010010000","11010011100","1100011101011"];

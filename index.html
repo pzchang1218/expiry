@@ -250,7 +250,7 @@ body.dark .seg{background:#0b100f;}
   <h1>💊 效期盤點小幫手<span id="cloudDot" style="margin-left:auto;font-size:15px;opacity:.9;cursor:pointer" onclick="gotoData()" title="雲端同步狀態"></span><button onclick="gotoData()" style="margin-left:6px" title="備份 / 還原 / 同步" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">💾</button><button id="themeBtn" onclick="toggleTheme()" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">🌙</button></h1>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.4</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v6.5</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -542,6 +542,14 @@ body.dark .seg{background:#0b100f;}
       <label>指派給哪家廠商</label>
       <select id="asVendor"></select>
       <button class="btn-main" style="margin-top:10px" onclick="doAssignVendor()">🔗 指派給勾選的商品</button>
+    </div>
+    <div class="card" style="border:2px solid #7a4b8a">
+      <h2 style="color:#7a4b8a">📦 退貨清單(<span id="retCount">0</span>)</h2>
+      <div id="returnBox"></div>
+      <button class="btn-main" style="margin-top:10px;background:#7a4b8a" onclick="printReturns()">🖨️ 列印退貨單(依廠商分頁)</button>
+      <button class="btn-ghost" style="margin-top:8px" onclick="exportReturns()">⬇️ 匯出退貨單 Excel</button>
+      <button class="btn-ghost" style="margin-top:8px" onclick="finishReturns()">✅ 全部標記為已退貨並結案</button>
+      <button class="btn-sm btn-danger" style="margin-top:8px;width:100%" onclick="clearReturns()">清空退貨清單</button>
     </div>
     <div class="card">
       <h2>🏭 廠商聯絡簿</h2>
@@ -943,7 +951,7 @@ function showView(v){
   if(v==='scan'){ renderToday(); }
   if(v==='records'){ renderRecords(); stopCam(); }
   if(v==='alert'){ renderAlert(); stopCam(); }
-  if(v==='buy'){ renderBuy(); renderStale(); renderVendors(); renderAssignList(); stopCam(); }
+  if(v==='buy'){ renderBuy(); renderStale(); renderVendors(); renderAssignList(); renderReturns(); stopCam(); }
   if(v==='pro'){ renderPro(); stopCam(); }
 }
 
@@ -2198,7 +2206,8 @@ async function cloudPush(manual){
     await fsPut('records', records);
     await fsPut('extras', {trash:trash,
       recallLog:(typeof recallLog!=='undefined'?recallLog:[]),
-      orderList:(typeof orderList!=='undefined'?orderList:[]), operators:(typeof operators!=='undefined'?operators:[]),
+      orderList:(typeof orderList!=='undefined'?orderList:[]), returnList:(typeof returnList!=='undefined'?returnList:[]),
+      vendors:(typeof vendors!=='undefined'?vendors:{}), operators:(typeof operators!=='undefined'?operators:[]),
       zoneOwners:(typeof zoneOwners!=='undefined'?zoneOwners:{}),
       settings:{lowTh:S('pos-low-th'), incZero:S('pos-inc-zero')}});
     try{ localStorage.setItem('pos-cloud-last', String(Date.now())); }catch(e){}
@@ -2322,6 +2331,19 @@ function restoreExtras(d, mergeMode){
       recallLog.sort((a,b)=>String(b.ts).localeCompare(String(a.ts)));
       put('pos-recall-log', JSON.stringify(recallLog));
     }
+    // 退貨清單
+    if(Array.isArray(d.returnList)){
+      if(typeof returnList==='undefined') returnList = [];
+      const seen = new Set(returnList.map(o=>o.rid));
+      for(const o of d.returnList) if(!seen.has(o.rid)){ returnList.push(o); seen.add(o.rid); }
+      put('pos-returns', JSON.stringify(returnList));
+    }
+    // 廠商聯絡簿
+    if(d.vendors && typeof d.vendors==='object'){
+      if(typeof vendors==='undefined') vendors = {};
+      for(const k of Object.keys(d.vendors)) if(mergeMode ? !vendors[k] : true) vendors[k] = d.vendors[k];
+      put('pos-vendors', JSON.stringify(vendors));
+    }
     // 叫貨清單
     if(Array.isArray(d.orderList)){
       if(typeof orderList==='undefined') orderList = [];
@@ -2418,6 +2440,8 @@ function backupData(){
                    products:DB, records:records, trash:trash,
                    recallLog:(typeof recallLog!=='undefined'?recallLog:[]),
                    orderList:(typeof orderList!=='undefined'?orderList:[]),
+                   returnList:(typeof returnList!=='undefined'?returnList:[]),
+                   vendors:(typeof vendors!=='undefined'?vendors:{}),
                    operators:(typeof operators!=='undefined'?operators:[]),
                    zoneOwners:(typeof zoneOwners!=='undefined'?zoneOwners:{}),
                    settings:{ lowTh:S('pos-low-th'), incZero:S('pos-inc-zero'), theme:S('pos-theme') }};
@@ -3077,6 +3101,130 @@ async function afterStockIn(prod, qty){
   toast(`📥 已入庫 ${qty} ${prod.unit||''},庫存 ${book} → ${prod.stock}`);
 }
 
+/* ================= 退貨清單 ================= */
+let returnList = [];
+try{ returnList = JSON.parse(localStorage.getItem('pos-returns')||'[]'); }catch(e){ returnList = []; }
+function saveReturns(){ try{ localStorage.setItem('pos-returns', JSON.stringify(returnList)); }catch(e){} }
+function inReturn(rid){ return returnList.some(x=>x.rid===rid); }
+function returnable(p, r){
+  // 回傳:'yes' 可退 / 'late' 超過期限 / 'no' 不收退 / '' 未設定
+  if(!p || !p.vendor) return '';
+  const d = vendors[p.vendor] || {};
+  if(d.retDays === '0' || d.retDays === 0) return 'no';
+  const n = Number(d.retDays);
+  if(!n || isNaN(n)) return '';
+  return (r.days >= 0 && r.days <= n) ? 'yes' : 'late';
+}
+async function toggleReturn(rid){
+  const i = returnList.findIndex(x=>x.rid===rid);
+  if(i >= 0){ returnList.splice(i,1); }
+  else{
+    const r = records.find(x=>x.rid===rid);
+    if(!r) return;
+    const p = DB.find(x=>x.id===r.pid) || {};
+    returnList.push({rid:r.rid, pid:r.pid, name:r.name, unit:r.unit, batch:r.batch,
+      expiry:r.expiry, qty:r.qty, retQty:r.qty, vendor:p.vendor||'', price:p.price||'',
+      addedAt:new Date().toLocaleString('zh-TW',{hour12:false}), by:currentOp});
+    toast('已加入退貨清單');
+  }
+  saveReturns();
+  renderAlert(); renderReturns();
+}
+function setRetQty(rid, v){
+  const o = returnList.find(x=>x.rid===rid); if(!o) return;
+  o.retQty = Math.max(0, Number(v)||0); saveReturns(); renderReturns();
+}
+function clearReturns(){
+  if(!returnList.length) return;
+  if(!confirm('清空退貨清單?')) return;
+  returnList = []; saveReturns(); renderReturns();
+}
+function returnsByVendor(){
+  const g = {};
+  for(const o of returnList){ const v = (o.vendor||'').trim() || '未指定廠商'; (g[v]=g[v]||[]).push(o); }
+  return g;
+}
+function renderReturns(){
+  const box = document.getElementById('returnBox');
+  if(!box) return;
+  const g = returnsByVendor();
+  const total = returnList.reduce((s,o)=>s+(Number(o.retQty)||0),0);
+  const amount = returnList.reduce((s,o)=>s+((Number(o.retQty)||0)*(Number(o.price)||0)),0);
+  const cnt = document.getElementById('retCount');
+  if(cnt) cnt.textContent = returnList.length;
+  box.innerHTML = returnList.length
+    ? `<p class="muted" style="margin:0 0 8px">共 <b>${returnList.length}</b> 批、<b>${total}</b> 件${amount?`、進價約 <b>${amount.toLocaleString()}</b> 元`:''}</p>`
+      + Object.keys(g).map(v=>{
+        const d = vendors[v]||{};
+        return `<p class="muted" style="margin:12px 0 4px;font-weight:700;color:var(--brand-dk)">
+            🏭 ${esc(v)}(${g[v].length})${d.rep?'　'+esc(d.rep):''}
+            ${d.tel?`　<a href="tel:${esc(d.tel)}">📞 ${esc(d.tel)}</a>`:''}
+            ${d.retDays?`<br><span class="tiny">退貨條件:效期前 ${esc(d.retDays)} 天內${d.retNote?'・'+esc(d.retNote):''}</span>`:''}</p>`
+          + g[v].map(o=>`<div class="rec-batch" style="grid-template-columns:1fr 70px auto">
+              <span><b>${esc(o.name)}</b><br><span class="muted" style="font-size:12px">
+                批 ${esc(o.batch||'—')}｜效期 ${esc(o.expiry)}｜庫存 ${o.qty} ${esc(o.unit||'')}</span></span>
+              <input type="number" inputmode="numeric" value="${o.retQty}" onchange="setRetQty('${o.rid}', this.value)" style="padding:6px">
+              <button class="btn-sm btn-danger" onclick="toggleReturn('${o.rid}')">移除</button>
+            </div>`).join('');
+      }).join('')
+    : '<p class="muted center" style="padding:12px 0">清單是空的。<br>到「⏰ 效期警示」按品項的「📦 加入退貨」即可。</p>';
+}
+function exportReturns(){
+  if(!returnList.length){ toast('退貨清單是空的'); return; }
+  const wb = XLSX.utils.book_new();
+  const g = returnsByVendor();
+  for(const v of Object.keys(g)){
+    const safe = v.replace(/[\\\/\?\*\[\]:]/g,'_').slice(0,28);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(g[v].map(o=>({
+      '品名':o.name,'批號':o.batch,'效期':o.expiry,'退貨數量':o.retQty,'單位':o.unit,
+      '進價':o.price||'','小計':(Number(o.retQty)||0)*(Number(o.price)||0)||''
+    }))), safe);
+  }
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(returnList.map(o=>({
+    '廠商':o.vendor,'品名':o.name,'批號':o.batch,'效期':o.expiry,'退貨數量':o.retQty,
+    '單位':o.unit,'進價':o.price||'','小計':(Number(o.retQty)||0)*(Number(o.price)||0)||'','登記人':o.by||''
+  }))), '全部彙總');
+  const d=new Date();
+  saveWorkbook(wb, `退貨單_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}.xlsx`);
+}
+function printReturns(){
+  if(!returnList.length){ toast('退貨清單是空的'); return; }
+  const d = new Date().toLocaleDateString('zh-TW');
+  const g = returnsByVendor();
+  const html = Object.keys(g).map((v,idx)=>{
+    const info = vendors[v]||{};
+    const rows = g[v].map((o,i)=>`<tr><td>${i+1}</td><td>${esc(o.name)}</td><td>${esc(o.batch||'—')}</td>
+      <td>${esc(o.expiry)}</td><td><b>${o.retQty}</b> ${esc(o.unit||'')}</td>
+      <td>${o.price||''}</td><td>${(Number(o.retQty)||0)*(Number(o.price)||0)||''}</td></tr>`).join('');
+    const sum = g[v].reduce((s,o)=>s+((Number(o.retQty)||0)*(Number(o.price)||0)),0);
+    return `<div style="${idx?'page-break-before:always;padding-top:10px;':''}">
+      <h1>退 貨 單</h1>
+      <p>廠商:<b>${esc(v)}</b>${info.rep?'　業務:'+esc(info.rep):''}${info.tel?'　電話:'+esc(info.tel):''}<br>
+         日期:${d}　共 ${g[v].length} 項${info.retNote?'　退貨條件:'+esc(info.retNote):''}</p>
+      <table><thead><tr><th>#</th><th>品名</th><th>批號</th><th>效期</th><th>退貨數量</th><th>進價</th><th>小計</th></tr></thead>
+      <tbody>${rows}</tbody>${sum?`<tfoot><tr><td colspan="6" style="text-align:right"><b>合計</b></td><td><b>${sum.toLocaleString()}</b></td></tr></tfoot>`:''}</table>
+      <p style="margin-top:20px">藥局簽章:__________________　　廠商收件簽章:__________________</p></div>`;
+  }).join('');
+  openPrint(html);
+}
+async function finishReturns(){
+  if(!returnList.length){ toast('退貨清單是空的'); return; }
+  if(!confirm(`把清單中 ${returnList.length} 批標記為「已退貨廠商」並結案?\n(會計入處理紀錄,不列為損失)`)) return;
+  const now = new Date().toLocaleString('zh-TW',{hour12:false});
+  let n=0;
+  for(const o of returnList){
+    const r = records.find(x=>x.rid===o.rid);
+    if(!r) continue;
+    r.done = true; r.doneTs = now; r.doneWay = 'return';
+    r.doneQty = Number(o.retQty)||0; r.loss = 0; r.doneBy = currentOp; touch(r);
+    n++;
+  }
+  await sSet('pos-records', JSON.stringify(records));
+  returnList = []; saveReturns();
+  renderReturns(); renderAlert(); refreshAll(); renderToday();
+  toast(`✓ 已完成 ${n} 批退貨並結案`);
+}
+
 /* ================= 批次指派廠商 ================= */
 function renderAssignList(){
   const q = (document.getElementById('asSearch').value||'').trim().toLowerCase();
@@ -3691,6 +3839,7 @@ function renderToday(){
   if(today) items.push(`<b style="font-size:18px">${today}</b> 件今天到期`);
   if(a.m1.length) items.push(`<b style="font-size:18px">${a.m1.length}</b> 件一個月內到期`);
   if(low) items.push(`<b style="font-size:18px">${low}</b> 件庫存偏低`);
+  if(typeof returnList!=='undefined' && returnList.length) items.push(`<b style="font-size:18px">${returnList.length}</b> 批待退貨`);
   box.innerHTML = items.length
     ? '<div style="line-height:2">' + items.map(t=>'· '+t).join('<br>') + '</div>'
       + `<button class="btn-sm" style="margin-top:10px;background:rgba(255,255,255,.22);color:#fff" onclick="showView('alert')">前往處理 →</button>`
@@ -3781,6 +3930,7 @@ function renderAlert(){
         <div class="dt">效期 <b>${esc(r.expiry)}</b> ${r.days<0?'(已過期 '+(-r.days)+' 天)':'(剩 '+r.days+' 天)'}｜批 ${esc(r.batch||'—')}｜${r.qty} ${esc(r.unit||'')}${p.shelf?'｜📍 '+esc(p.shelf):''}</div>
         ${vendorLine(p, r)}
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn-sm ${inReturn(r.rid)?'btn-danger':'btn-line'}" onclick="toggleReturn('${r.rid}')">${inReturn(r.rid)?'✓ 已在退貨清單':'📦 加入退貨'}</button>
           <button class="btn-sm btn-line" onclick="openFromAlert('${r.pid}','${r.rid}')">✏️ 修改此批</button>
           <button class="btn-sm btn-line" onclick="markDone('${r.rid}')">✔ 已處理,結案</button>
         </div>

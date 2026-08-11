@@ -1,5 +1,5 @@
-// v5:index.html 網路優先;雲端 API 完全不快取(避免同步結果被舊回應蓋掉)
-const CACHE = 'pos-expiry-v5';
+// v6:index.html 網路優先;更新相機版面與工作導覽後淘汰舊快取
+const CACHE = 'pos-expiry-v6';
 const PRECACHE = [
   './index.html', './manifest.json', './icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

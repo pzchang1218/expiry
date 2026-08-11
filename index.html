@@ -66,11 +66,28 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 .tabs button.active{color:var(--brand);}
 .tabs .ico{font-size:22px; line-height:1;}
 .hidden{display:none !important;}
-#scanBox{border-radius:var(--radius); overflow:hidden; background:#000; min-height:0;
-  max-width:440px; margin:0 auto; position:relative;}
-#scanBox video{width:100% !important; height:auto !important; display:block; border-radius:var(--radius);}
-#scanBox > div{width:100% !important;}
+#scanBox{width:100%; max-width:520px; margin:0 auto; border-radius:var(--radius);
+  overflow:hidden; background:#000; min-height:0; position:relative;}
+/*
+  摺疊機的相機串流常回報「直式」內在尺寸。若使用 height:auto，展開與
+  未展開都會被撐成超高的直式預覽；固定顯示框比例，再用 cover 裁切，
+  才能讓兩種螢幕狀態都維持可掃條碼的橫向取景範圍。
+*/
+#scanBox:not(:empty){aspect-ratio:16 / 9;}
+#scanBox video{width:100% !important; height:100% !important; object-fit:cover;
+  display:block; border-radius:var(--radius);}
+#scanBox > div{width:100% !important; height:100% !important; max-height:100% !important;}
 #scanBox img{display:none !important;}   /* 隱藏函式庫的預設佔位圖 */
+.section-lead{margin:0 2px 10px;}
+.section-lead h2{margin:0; font-size:20px; color:var(--ink);}
+.section-lead p{margin:4px 0 0; color:var(--ink2); font-size:13px; line-height:1.5;}
+.task-nav{display:flex; gap:6px; overflow-x:auto; margin:0 0 12px; padding:5px;
+  background:var(--card); border:1px solid var(--line); border-radius:13px;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch;}
+.task-nav::-webkit-scrollbar{display:none;}
+.task-nav button{flex:1 0 auto; min-width:76px; padding:9px 11px; border-radius:9px;
+  background:transparent; color:var(--ink2); font-size:13px; white-space:nowrap;}
+.task-nav button.active{background:var(--brand); color:#fff; box-shadow:0 2px 6px rgba(15,138,109,.22);}
 .hint{font-size:13px; color:var(--ink2); margin:8px 0 0; line-height:1.6;}
 .prod-card{
   background:var(--brand-lt); border:1.5px solid var(--brand); border-radius:var(--radius);
@@ -212,7 +229,7 @@ body.dark .seg{background:#0b100f;}
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v5';
+    const KEEP = 'pos-expiry-v6';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -250,10 +267,10 @@ body.dark .seg{background:#0b100f;}
 </div>
 
 <header>
-  <h1>💊 效期盤點小幫手<span id="cloudDot" style="margin-left:auto;font-size:15px;opacity:.9;cursor:pointer" onclick="gotoData()" title="雲端同步狀態"></span><button onclick="gotoData()" style="margin-left:6px" title="備份 / 還原 / 同步" style="background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">💾</button><button id="themeBtn" onclick="toggleTheme()" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">🌙</button></h1>
+  <h1>💊 效期盤點小幫手<span id="cloudDot" style="margin-left:auto;font-size:15px;opacity:.9;cursor:pointer" onclick="gotoData()" title="雲端同步狀態"></span><button onclick="gotoData()" title="備份 / 還原 / 同步" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">💾</button><button id="themeBtn" onclick="toggleTheme()" style="margin-left:6px;background:rgba(255,255,255,.18);color:#fff;border:none;border-radius:10px;padding:5px 10px;font-size:16px;cursor:pointer;">🌙</button></h1>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.0</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.1</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -419,6 +436,16 @@ body.dark .seg{background:#0b100f;}
 
   <!-- ============ 盤點記錄 ============ -->
   <section id="viewRecords" class="hidden">
+    <div class="section-lead">
+      <h2>📋 盤點工作</h2>
+      <p>先看盤點進度；需要匯出或維護資料時，再切換工作項目。</p>
+    </div>
+    <div class="task-nav" aria-label="盤點工作選單">
+      <button class="active" data-task-tab="list" onclick="setTaskPanel('records','list')">盤點紀錄</button>
+      <button data-task-tab="reports" onclick="setTaskPanel('records','reports')">報表匯出</button>
+      <button data-task-tab="data" onclick="setTaskPanel('records','data')">資料管理</button>
+    </div>
+    <div class="task-panel" data-task-panel="list">
     <div class="stat-row">
       <div class="stat"><div class="num" id="stItems">0</div><div class="lbl">已盤品項</div></div>
       <div class="stat"><div class="num" id="stBatches">0</div><div class="lbl">登記批次</div></div>
@@ -446,10 +473,21 @@ body.dark .seg{background:#0b100f;}
       </div>
     </div>
     <div class="card" id="recList"></div>
+    </div>
+
+    <div class="task-panel hidden" data-task-panel="reports">
     <div class="card">
+      <h2>📊 報表與匯出</h2>
       <button class="btn-main" onclick="exportMonthly()">📊 產生本月月報 Excel</button>
       <button class="btn-main" style="margin-top:10px;background:#7a4b8a" onclick="exportDestroy()">📄 產生銷燬紀錄表</button>
       <button class="btn-main" style="margin-top:10px" onclick="exportXlsx()">⬇️ 匯出盤點結果 Excel</button>
+      <p class="hint">日常查詢留在「盤點紀錄」；只有要交付或留存檔案時才需要進到這裡。</p>
+    </div>
+    </div>
+
+    <div class="task-panel hidden" data-task-panel="data">
+    <div class="card">
+      <h2>🔄 商品主檔維護</h2>
       <button class="btn-ghost" style="margin-top:10px" onclick="reUpload()">🔄 從 POS 更新商品主檔</button>
       <p class="hint">匯入 POS 匯出的 Excel 時,只更新名稱/條碼/單位,<br><b>庫存以 App 的實盤為準不會被覆蓋</b>,貨架、分類、廠商、價格與標記也完整保留。<br>(新品項的庫存則會帶入 POS 的數字)</p>
       <button class="btn-ghost" style="margin-top:10px" onclick="restoreBuiltin()">♻️ 還原內建商品資料</button>
@@ -490,10 +528,15 @@ body.dark .seg{background:#0b100f;}
       <details style="margin-top:10px"><summary style="cursor:pointer;font-size:14px;color:var(--ink2);">🗑️ 回收桶(<span id="trashCount">0</span>)— 誤刪的記錄 30 天內可救回</summary><div id="trashList"></div></details>
       <button class="btn-sm btn-danger" style="margin-top:10px; width:100%" onclick="clearAll()">🗑 清除全部盤點記錄</button>
     </div>
+    </div>
   </section>
 
   <!-- ============ 效期警示 ============ -->
   <section id="viewAlert" class="hidden">
+    <div class="section-lead">
+      <h2>⏰ 效期處理</h2>
+      <p>查看即期與過期品項、結案處理及列印標籤。</p>
+    </div>
     <div class="stat-row" id="tierChips"></div>
     <div class="card">
       <h2>⏰ 效期檢查報告 <span class="muted" id="alertDate"></span></h2>
@@ -508,10 +551,21 @@ body.dark .seg{background:#0b100f;}
 
   <!-- ============ 補貨叫貨 ============ -->
   <section id="viewBuy" class="hidden">
+    <div class="section-lead">
+      <h2>🛒 庫存工作</h2>
+      <p>依今天要做的事切換，不必一路往下找功能。</p>
+    </div>
+    <div class="task-nav" aria-label="庫存工作選單">
+      <button class="active" data-task-tab="low" onclick="setTaskPanel('buy','low')">低庫存</button>
+      <button data-task-tab="order" onclick="setTaskPanel('buy','order')">叫貨</button>
+      <button data-task-tab="returns" onclick="setTaskPanel('buy','returns')">退貨</button>
+      <button data-task-tab="vendors" onclick="setTaskPanel('buy','vendors')">廠商</button>
+    </div>
     <div class="stat-row">
       <div class="stat"><div class="num" id="bLow">0</div><div class="lbl">庫存偏低</div></div>
       <div class="stat"><div class="num" id="bOrder">0</div><div class="lbl">叫貨清單</div></div>
     </div>
+    <div class="task-panel" data-task-panel="low">
     <div class="card">
       <h2>📉 低庫存提醒</h2>
       <div style="display:flex;gap:8px;align-items:center">
@@ -524,6 +578,8 @@ body.dark .seg{background:#0b100f;}
       <input id="lowFilter" placeholder="🔍 搜尋(可用分類或貨架)" autocomplete="off" style="margin-top:8px">
       <div id="lowList"></div>
     </div>
+    </div>
+    <div class="task-panel hidden" data-task-panel="order">
     <div class="card">
       <h2>🛒 叫貨清單</h2>
       <div id="orderList"></div>
@@ -531,6 +587,8 @@ body.dark .seg{background:#0b100f;}
       <button class="btn-ghost" style="margin-top:8px" onclick="printOrder()">🖨️ 列印/傳送叫貨單</button>
       <button class="btn-sm btn-danger" style="margin-top:8px;width:100%" onclick="clearOrder()">清空叫貨清單</button>
     </div>
+    </div>
+    <div class="task-panel hidden" data-task-panel="vendors">
     <div class="card" style="border:2px solid var(--brand)">
       <h2>🔗 批次指派廠商</h2>
       <p class="muted" id="assignProgress" style="margin:0 0 8px;font-size:13px"></p>
@@ -548,6 +606,8 @@ body.dark .seg{background:#0b100f;}
       <select id="asVendor"></select>
       <button class="btn-main" style="margin-top:10px" onclick="doAssignVendor()">🔗 指派給勾選的商品</button>
     </div>
+    </div>
+    <div class="task-panel hidden" data-task-panel="returns">
     <div class="card" style="border:2px solid #7a4b8a">
       <h2 style="color:#7a4b8a">📦 退貨清單(<span id="retCount">0</span>)</h2>
       <div id="returnBox"></div>
@@ -556,29 +616,21 @@ body.dark .seg{background:#0b100f;}
       <button class="btn-ghost" style="margin-top:8px" onclick="finishReturns()">✅ 全部標記為已退貨並結案</button>
       <button class="btn-sm btn-danger" style="margin-top:8px;width:100%" onclick="clearReturns()">清空退貨清單</button>
     </div>
+    </div>
+    <div class="task-panel hidden" data-task-panel="vendors">
     <div class="card">
       <h2>🏭 廠商聯絡簿</h2>
       <div id="vendorBox"></div>
     </div>
-    <div class="card">
-      <h2>🏷️ 自製商品條碼</h2>
-      <p class="muted" style="margin:0 0 8px;font-size:13px">分裝品、自製包等沒有條碼的商品,可產生條碼標籤貼上後掃描</p>
-      <button class="btn-main" onclick="document.getElementById('bcModal').classList.remove('hidden');openBarcodeModal()">🏷️ 產生條碼標籤</button>
-    </div>
-    <div class="card">
-      <h2>📉 呆滯品分析</h2>
-      <p class="muted" style="margin:0 0 8px;font-size:13px">超過設定天數沒有任何盤點異動的商品 — 佔資金也佔空間</p>
-      <div style="display:flex;gap:8px;align-items:center">
-        <span class="muted" style="white-space:nowrap">停滯超過</span>
-        <input id="staleDays" type="number" inputmode="numeric" value="180" style="flex:1" onchange="renderStale()">
-        <span class="muted">天</span>
-      </div>
-      <div id="staleList"></div>
     </div>
   </section>
 
   <!-- ============ 顧客服務(代訂 / 慢箋回領) ============ -->
   <section id="viewCust" class="hidden">
+    <div class="section-lead">
+      <h2>🙋 顧客追蹤</h2>
+      <p>集中處理代訂、缺貨通知與慢箋回領提醒。</p>
+    </div>
     <div class="stat-row">
       <div class="stat"><div class="num" id="cDue">0</div><div class="lbl">今日該聯絡</div></div>
       <div class="stat"><div class="num" id="cOrder">0</div><div class="lbl">代訂中</div></div>
@@ -637,79 +689,110 @@ body.dark .seg{background:#0b100f;}
     </div>
   </section>
 
-  <!-- ============ 分析(風險預警 / 分區盤點 / 毛利) ============ -->
+  <!-- ============ 更多工具 / 分析 ============ -->
   <section id="viewPro" class="hidden">
-    <div class="card">
-      <h2>📈 趨 勢 圖(近 12 個月)</h2>
-      <div class="seg">
-        <button id="tgLoss" class="on" onclick="setTrend('loss')">損失金額</button>
-        <button id="tgDone" onclick="setTrend('done')">結案筆數</button>
-        <button id="tgScan" onclick="setTrend('scan')">登記批次</button>
+    <div class="section-lead">
+      <h2>☰ 更多工作</h2>
+      <p>低頻但重要的功能集中在這裡，再依任務切換。</p>
+    </div>
+    <div class="task-nav" aria-label="更多工作選單">
+      <button class="active" data-task-tab="tools" onclick="setTaskPanel('pro','tools')">現場工具</button>
+      <button data-task-tab="stock" onclick="setTaskPanel('pro','stock')">盤點管理</button>
+      <button data-task-tab="analysis" onclick="setTaskPanel('pro','analysis')">經營分析</button>
+      <button data-task-tab="promo" onclick="setTaskPanel('pro','promo')">促銷</button>
+    </div>
+
+    <div class="task-panel" data-task-panel="tools">
+      <div class="card" style="border:2px solid #b3261e">
+        <h2 style="color:#b3261e">🚨 藥品回收批號比對</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">收到公會/食藥署回收公文時,貼上品名與批號,立刻查出店裡有沒有這批貨</p>
+        <label>藥品名稱(可只打關鍵字)</label>
+        <input id="rcName" placeholder="例:保你爾 或 保你爾膜衣錠8毫克" autocomplete="off">
+        <label>回收批號(多個批號用空格或逗號分隔)</label>
+        <input id="rcBatch" placeholder="例:2KA31 2KA32" autocomplete="off">
+        <div class="row2" style="margin-top:12px">
+          <button class="btn-line" style="padding:12px" onclick="clearRecall()">清空</button>
+          <button class="btn-main" style="padding:12px;background:#b3261e" onclick="checkRecall()">🔍 立即比對</button>
+        </div>
+        <div id="rcResult"></div>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📋 回收處理紀錄(<span id="rcLogCount">0</span>)</summary>
+          <div id="rcLog"></div>
+        </details>
       </div>
-      <div id="trendChart"></div>
-    </div>
-
-    <div class="card">
-      <h2>🔍 損 耗 原 因 分 析</h2>
-      <div id="lossBox"></div>
-    </div>
-
-    <div class="card">
-      <h2>🎪 促 銷 檔 期</h2>
-      <div id="campBox"></div>
-      <div class="row2" style="margin-top:10px">
-        <button class="btn-ghost" onclick="newCampaign()">➕ 建立新檔期</button>
-        <button class="btn-ghost" onclick="exportCamp()">⬇️ 匯出成效</button>
+      <div class="card">
+        <h2>🏷️ 自製商品條碼</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">分裝品、自製包等沒有條碼的商品,可產生標籤貼上後掃描</p>
+        <button class="btn-main" onclick="document.getElementById('bcModal').classList.remove('hidden');openBarcodeModal()">🏷️ 產生條碼標籤</button>
       </div>
     </div>
 
-    <div class="card">
-      <h2>📸 盤 點 快 照</h2>
-      <p class="muted" style="margin:0 0 8px;font-size:13px">存下當下的庫存狀態,日後可比較兩次之間哪些品項變化最大</p>
-      <button class="btn-main" onclick="takeSnapshot()">📸 建立此刻的快照</button>
-      <div id="snapBox"></div>
-    </div>
-
-    <div class="card" style="border:2px solid #b3261e">
-      <h2 style="color:#b3261e">🚨 藥品回收批號比對</h2>
-      <p class="muted" style="margin:0 0 8px;font-size:13px">收到公會/食藥署回收公文時,貼上品名與批號,立刻查出店裡有沒有這批貨</p>
-      <label>藥品名稱(可只打關鍵字)</label>
-      <input id="rcName" placeholder="例:保你爾 或 保你爾膜衣錠8毫克" autocomplete="off">
-      <label>回收批號(多個批號用空格或逗號分隔)</label>
-      <input id="rcBatch" placeholder="例:2KA31 2KA32" autocomplete="off">
-      <div class="row2" style="margin-top:12px">
-        <button class="btn-line" style="padding:12px" onclick="clearRecall()">清空</button>
-        <button class="btn-main" style="padding:12px;background:#b3261e" onclick="checkRecall()">🔍 立即比對</button>
+    <div class="task-panel hidden" data-task-panel="stock">
+      <div class="card">
+        <h2>📋 分區盤點</h2>
+        <select id="zoneSel" onchange="renderZone()"></select>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <span class="muted" style="white-space:nowrap">👤 負責人</span>
+          <select id="zoneOwner" style="flex:1" onchange="setZoneOwner(this.value)"></select>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--ink2);cursor:pointer;">
+          <input type="checkbox" id="myZonesOnly" style="width:auto" onchange="toggleMyZones(this.checked)"> 只顯示指派給我的區域
+        </label>
+        <div id="zoneBox"></div>
+        <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📑 全部區域分工表</summary><div id="zoneTable"></div></details>
       </div>
-      <div id="rcResult"></div>
-      <details style="margin-top:10px">
-        <summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📋 回收處理紀錄(<span id="rcLogCount">0</span>)</summary>
-        <div id="rcLog"></div>
-      </details>
-    </div>
-
-
-    <div class="card">
-      <h2>🔮 過期風險預警</h2>
-      <p class="muted" style="margin:0 0 8px;font-size:13px">依商品的歷史消耗速度,推估效期內是否賣得完</p>
-      <div id="riskBox"></div>
-    </div>
-    <div class="card">
-      <h2>📋 分區盤點</h2>
-      <select id="zoneSel" onchange="renderZone()"></select>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <span class="muted" style="white-space:nowrap">👤 負責人</span>
-        <select id="zoneOwner" style="flex:1" onchange="setZoneOwner(this.value)"></select>
+      <div class="card">
+        <h2>📸 盤點快照</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">存下當下的庫存狀態,日後可比較兩次之間哪些品項變化最大</p>
+        <button class="btn-main" onclick="takeSnapshot()">📸 建立此刻的快照</button>
+        <div id="snapBox"></div>
       </div>
-      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--ink2);cursor:pointer;">
-        <input type="checkbox" id="myZonesOnly" style="width:auto" onchange="toggleMyZones(this.checked)"> 只顯示指派給我的區域
-      </label>
-      <div id="zoneBox"></div>
-      <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📑 全部區域分工表</summary><div id="zoneTable"></div></details>
     </div>
-    <div class="card">
-      <h2>💰 毛利與損失對照</h2>
-      <div id="marginBox"></div>
+
+    <div class="task-panel hidden" data-task-panel="analysis">
+      <div class="card">
+        <h2>📈 趨勢圖(近 12 個月)</h2>
+        <div class="seg">
+          <button id="tgLoss" class="on" onclick="setTrend('loss')">損失金額</button>
+          <button id="tgDone" onclick="setTrend('done')">結案筆數</button>
+          <button id="tgScan" onclick="setTrend('scan')">登記批次</button>
+        </div>
+        <div id="trendChart"></div>
+      </div>
+      <div class="card">
+        <h2>🔍 損耗原因分析</h2>
+        <div id="lossBox"></div>
+      </div>
+      <div class="card">
+        <h2>🔮 過期風險預警</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">依商品的歷史消耗速度,推估效期內是否賣得完</p>
+        <div id="riskBox"></div>
+      </div>
+      <div class="card">
+        <h2>📉 呆滯品分析</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">超過設定天數沒有任何盤點異動的商品 — 佔資金也佔空間</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="muted" style="white-space:nowrap">停滯超過</span>
+          <input id="staleDays" type="number" inputmode="numeric" value="180" style="flex:1" onchange="renderStale()">
+          <span class="muted">天</span>
+        </div>
+        <div id="staleList"></div>
+      </div>
+      <div class="card">
+        <h2>💰 毛利與損失對照</h2>
+        <div id="marginBox"></div>
+      </div>
+    </div>
+
+    <div class="task-panel hidden" data-task-panel="promo">
+      <div class="card">
+        <h2>🎪 促銷檔期</h2>
+        <div id="campBox"></div>
+        <div class="row2" style="margin-top:10px">
+          <button class="btn-ghost" onclick="newCampaign()">➕ 建立新檔期</button>
+          <button class="btn-ghost" onclick="exportCamp()">⬇️ 匯出成效</button>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -717,7 +800,7 @@ body.dark .seg{background:#0b100f;}
 
 <div id="bcModal" class="hidden" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;">
   <div style="background:var(--card);border-radius:16px;padding:18px;max-width:420px;width:100%;max-height:88vh;overflow:auto;">
-    <h2 style="margin:0 0 4px;font-size:17px;">🏷️ 自製商品條碼</h2>
+    <h2 style="margin:0 0 4px;font-size:17px;">🏷️ 產生商品條碼標籤</h2>
     <p class="muted" style="margin:0 0 10px;font-size:13px">沒有條碼的商品(<b id="bcNoCount">0</b> 項)可自動產生條碼並列印貼上,之後就能掃描</p>
     <input id="bcSearch" placeholder="🔍 搜尋商品(留空=只顯示沒有條碼的)" oninput="renderBcCandidates(this.value)">
     <div id="bcList" style="max-height:38vh;overflow:auto;margin-top:8px"></div>
@@ -798,12 +881,12 @@ body.dark .seg{background:#0b100f;}
 </div>
 
 <nav class="tabs" id="tabs" style="display:none">
-  <button id="tabScan" class="active" onclick="showView('scan')"><span class="ico">📷</span>掃描登記</button>
-  <button id="tabAlert" onclick="showView('alert')"><span class="ico">⏰</span>效期警示</button>
-  <button id="tabRec" onclick="showView('records')"><span class="ico">📋</span>盤點記錄</button>
-  <button id="tabBuy" onclick="showView('buy')"><span class="ico">🛒</span>補貨叫貨</button>
+  <button id="tabScan" class="active" onclick="showView('scan')"><span class="ico">📷</span>掃描</button>
+  <button id="tabAlert" onclick="showView('alert')"><span class="ico">⏰</span>效期</button>
+  <button id="tabRec" onclick="showView('records')"><span class="ico">📋</span>盤點</button>
+  <button id="tabBuy" onclick="showView('buy')"><span class="ico">🛒</span>庫存</button>
   <button id="tabCust" onclick="showView('cust')"><span class="ico">🙋</span>顧客</button>
-  <button id="tabPro" onclick="showView('pro')"><span class="ico">🔮</span>分析</button>
+  <button id="tabPro" onclick="showView('pro')"><span class="ico">☰</span>更多</button>
 </nav>
 
 <div class="toast" id="toast"></div>
@@ -1037,6 +1120,20 @@ function enterApp(){
 }
 
 /* ================= 畫面切換 ================= */
+const taskPanelState = {records:'list', buy:'low', pro:'tools'};
+function setTaskPanel(view, key){
+  const ids = {records:'viewRecords', buy:'viewBuy', pro:'viewPro'};
+  const root = document.getElementById(ids[view]);
+  if(!root) return;
+  taskPanelState[view] = key;
+  root.querySelectorAll('[data-task-panel]').forEach(el=>
+    el.classList.toggle('hidden', el.dataset.taskPanel !== key));
+  root.querySelectorAll('[data-task-tab]').forEach(btn=>{
+    const on = btn.dataset.taskTab === key;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+}
 function showView(v){
   document.getElementById('viewScan').classList.toggle('hidden', v!=='scan');
   document.getElementById('viewRecords').classList.toggle('hidden', v!=='records');
@@ -1051,10 +1148,10 @@ function showView(v){
   document.getElementById('tabPro').classList.toggle('active', v==='pro');
   document.getElementById('tabCust').classList.toggle('active', v==='cust');
   if(v==='scan'){ renderToday(); }
-  if(v==='records'){ renderRecords(); stopCam(); }
+  if(v==='records'){ setTaskPanel('records', taskPanelState.records); renderRecords(); stopCam(); }
   if(v==='alert'){ renderAlert(); stopCam(); }
-  if(v==='buy'){ renderBuy(); renderStale(); renderVendors(); renderAssignList(); renderReturns(); stopCam(); }
-  if(v==='pro'){ renderPro(); stopCam(); }
+  if(v==='buy'){ setTaskPanel('buy', taskPanelState.buy); renderBuy(); renderVendors(); renderAssignList(); renderReturns(); stopCam(); }
+  if(v==='pro'){ setTaskPanel('pro', taskPanelState.pro); renderPro(); stopCam(); }
   if(v==='cust'){ renderCust(); stopCam(); }
 }
 
@@ -2066,6 +2163,7 @@ async function restoreBuiltin(){
 }
 function gotoData(){
   showView('records');
+  setTaskPanel('records','data');
   setTimeout(()=>{
     const el = document.getElementById('dataCard');
     if(!el) return;
@@ -3406,7 +3504,7 @@ function applyVoiceDate(text){
   toast('✓ 已填入 '+y+'/'+String(m).padStart(2,'0')+(d?'/'+String(d).padStart(2,'0'):''));
   return true;
 }
-function renderPro(){ renderTrend(); renderLoss(); renderCamps(); renderSnaps(); renderRisk(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); }
+function renderPro(){ renderTrend(); renderLoss(); renderCamps(); renderSnaps(); renderRisk(); renderStale(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); }
 
 /* ================= 自製條碼(Code128)列印 ================= */
 const C128 = ["11011001100","11001101100","11001100110","10010011000","10010001100","10001001100","10011001000","10011000100","10001100100","11001001000","11001000100","11000100100","10110011100","10011011100","10011001110","10111001100","10011101100","10011100110","11001110010","11001011100","11001001110","11011100100","11001110100","11101101110","11101001100","11100101100","11100100110","11101100100","11100110100","11100110010","11011011000","11011000110","11000110110","10100011000","10001011000","10001000110","10110001000","10001101000","10001100010","11010001000","11000101000","11000100010","10110111000","10110001110","10001101110","10111011000","10111000110","10001110110","11101110110","11010001110","11000101110","11011101000","11011100010","11011101110","11101011000","11101000110","11100010110","11101101000","11101100010","11100011010","11101111010","11001000010","11110001010","10100110000","10100001100","10010110000","10010000110","10000101100","10000100110","10110010000","10110000100","10011010000","10011000010","10000110100","10000110010","11000010010","11001010000","11110111010","11000010100","10001111010","10100111100","10010111100","10010011110","10111100100","10011110100","10011110010","11110100100","11110010100","11110010010","11011011110","11011110110","11110110110","10101111000","10100011110","10001011110","10111101000","10111100010","11110101000","11110100010","10111011110","10111101110","11101011110","11110101110","11010000100","11010010000","11010011100","1100011101011"];

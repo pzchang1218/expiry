@@ -1,5 +1,5 @@
 // v6:index.html 網路優先;更新相機版面與工作導覽後淘汰舊快取
-const CACHE = 'pos-expiry-v6';
+const CACHE = 'pos-expiry-v7';
 const PRECACHE = [
   './index.html', './manifest.json', './icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

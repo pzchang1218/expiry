@@ -47,11 +47,11 @@ button{
 .btn-sm{padding:8px 12px; font-size:14px; border-radius:10px;}
 .btn-danger{background:var(--red-lt); color:var(--red);}
 .btn-line{background:var(--card); border:1.5px solid var(--line); color:var(--ink2);}
-input,select{
+input,select,textarea{
   font-family:inherit; font-size:17px; width:100%; padding:12px;
   border:1.5px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink);
 }
-input:focus{outline:2px solid var(--brand); border-color:var(--brand);}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--brand); border-color:var(--brand);}
 label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:10px 0 5px;}
 .tabs{
   position:fixed; bottom:0; left:0; right:0; z-index:30;
@@ -134,6 +134,24 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 .toast.show{opacity:.95;}
 .warn{background:var(--amber-lt); color:var(--amber); border-radius:10px; padding:10px; font-size:13px; line-height:1.6; margin-top:8px;}
 .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.app-modal{
+  position:fixed;inset:0;z-index:220;display:flex;align-items:center;justify-content:center;
+  padding:16px;background:rgba(7,31,25,.62);backdrop-filter:blur(3px);
+}
+.app-dialog{
+  width:100%;max-width:620px;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;
+  overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:22px;
+  box-shadow:0 20px 60px rgba(3,50,39,.28);
+}
+.app-dialog-sm{max-width:380px;}
+.app-dialog-head{padding:17px 18px 10px;border-bottom:1px solid var(--line);}
+.app-dialog-head h2{margin:0;font-size:18px;color:var(--ink);}
+.app-dialog-head p{margin:5px 0 0;color:var(--ink2);font-size:13px;line-height:1.5;}
+.app-dialog-body{padding:8px 18px 16px;overflow:auto;-webkit-overflow-scrolling:touch;}
+.app-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 18px 18px;border-top:1px solid var(--line);}
+.app-dialog-actions button{padding:12px;}
+.form-section-title{margin:14px 0 2px;color:var(--brand-dk);font-size:13px;font-weight:800;letter-spacing:.4px;}
+body.modal-open{overflow:hidden;}
 .center{text-align:center;}
 .flagbox{display:flex;align-items:center;gap:4px;font-size:13px;background:var(--bg);
   border:1px solid var(--line);border-radius:99px;padding:6px 11px;cursor:pointer;margin:0;}
@@ -290,8 +308,8 @@ main{padding-top:16px;}
 .btn-main:active{transform:translateY(1px);box-shadow:0 3px 9px rgba(13,150,117,.14);}
 .btn-ghost{border:1px solid #cfe9e0;border-radius:15px;background:linear-gradient(135deg,#eefbf7,var(--brand-lt));}
 .btn-line{border-color:#d7e8e3;border-radius:13px;background:#fff;}
-input,select{border-color:#d6e8e2;border-radius:14px;background:rgba(255,255,255,.98);box-shadow:inset 0 1px 2px rgba(15,82,66,.025);}
-input:focus,select:focus{outline:3px solid rgba(13,150,117,.14);border-color:var(--brand);}
+input,select,textarea{border-color:#d6e8e2;border-radius:14px;background:rgba(255,255,255,.98);box-shadow:inset 0 1px 2px rgba(15,82,66,.025);}
+input:focus,select:focus,textarea:focus{outline:3px solid rgba(13,150,117,.14);border-color:var(--brand);}
 .section-lead{
   position:relative;overflow:hidden;padding:13px 15px;margin:0 0 11px;
   border:1px solid #d4eae3;border-radius:20px 20px 20px 9px;
@@ -346,7 +364,7 @@ body.dark .section-lead{background:linear-gradient(135deg,#17372e,#1c4036);borde
 body.dark .stat:nth-child(3n+1){background:linear-gradient(145deg,#1a2622,#3b211f);}
 body.dark .stat:nth-child(3n+2){background:linear-gradient(145deg,#1a2622,#3b321b);}
 body.dark .stat:nth-child(3n+3){background:linear-gradient(145deg,#1a2622,#30283e);}
-body.dark input,body.dark select,body.dark .btn-line{background:#17221f;border-color:#31463f;}
+body.dark input,body.dark select,body.dark textarea,body.dark .btn-line{background:#17221f;border-color:#31463f;}
 body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-color:#2f5a4e;}
 
 @media(max-width:430px){
@@ -359,6 +377,11 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   .cute-welcome{grid-template-columns:minmax(0,1fr) 86px;min-height:112px;padding-left:14px;}
   .cute-welcome-copy h2{font-size:18px;}
   .cute-helper{width:82px;height:95px;}
+  .app-modal{padding:8px;align-items:flex-end;}
+  .app-dialog{max-height:calc(100dvh - 8px);border-radius:22px 22px 10px 10px;}
+  .app-dialog-head{padding:15px 14px 9px;}
+  .app-dialog-body{padding:6px 14px 14px;}
+  .app-dialog-actions{padding:10px 14px max(14px,env(safe-area-inset-bottom));}
 }
 @media(max-width:360px){
   header.app-header h1{font-size:15px;letter-spacing:.2px;}
@@ -376,7 +399,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v7';
+    const KEEP = 'pos-expiry-v8';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -429,7 +452,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.2</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.3</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -539,7 +562,8 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
           <div><label>安全存量(低於此數提醒叫貨)</label><input id="npMin" type="number" inputmode="numeric" placeholder="留空用預設"></div>
         </div>
         <div class="row2">
-          <div><label>供應商 / 廠商</label><input id="npVendor" list="vendorList" placeholder="叫貨單依此分組" autocomplete="off"><datalist id="vendorList"></datalist></div>
+          <div><label>供應商 / 廠商</label><input id="npVendor" list="vendorList" placeholder="叫貨單依此分組" autocomplete="off"><datalist id="vendorList"></datalist>
+            <button type="button" class="btn-sm btn-line" style="margin-top:7px;width:100%" onclick="addVendor('npVendor')">➕ 新增廠商基本資料</button></div>
           <div><label>進價(成本)</label><input id="npPrice" type="number" inputmode="decimal" placeholder="算損失用"></div>
         </div>
         <div class="row2">
@@ -1041,6 +1065,85 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
 </div>
 
+<div id="qtyModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="qtyModalTitle">
+  <div class="app-dialog app-dialog-sm">
+    <div class="app-dialog-head">
+      <h2 id="qtyModalTitle">🔢 修改數量</h2>
+      <p id="qtyModalMeta"></p>
+    </div>
+    <div class="app-dialog-body">
+      <label for="qtyEditInput">數量</label>
+      <input id="qtyEditInput" type="number" inputmode="decimal" min="0" step="any" enterkeyhint="done"
+        autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmQtyEdit();}">
+      <p class="hint">點入欄位會直接開啟數字鍵盤。</p>
+    </div>
+    <div class="app-dialog-actions">
+      <button class="btn-line" onclick="closeQtyModal()">取消</button>
+      <button class="btn-main" onclick="confirmQtyEdit()">✓ 確定修改</button>
+    </div>
+  </div>
+</div>
+
+<div id="vendorModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="vendorModalTitle">
+  <div class="app-dialog">
+    <div class="app-dialog-head">
+      <h2 id="vendorModalTitle">🏭 新增廠商基本資料</h2>
+      <p>資料會保存在系統內，品項建檔、效期警示、叫貨與 Excel 都可直接使用。</p>
+    </div>
+    <div class="app-dialog-body">
+      <div class="form-section-title">基本資料</div>
+      <label for="veName">廠商正式名稱 *</label>
+      <input id="veName" autocomplete="organization" placeholder="例：中西化學股份有限公司">
+      <div class="row2">
+        <div><label for="veNo">廠商編號</label><input id="veNo" inputmode="numeric" placeholder="例：0017"></div>
+        <div><label for="veShort">簡稱</label><input id="veShort" placeholder="例：中西化學"></div>
+      </div>
+      <div class="row2">
+        <div><label for="veCategory">廠商類別</label><input id="veCategory" placeholder="藥品／醫材／食品…"></div>
+        <div><label for="veTaxId">統一編號</label><input id="veTaxId" inputmode="numeric" autocomplete="off"></div>
+      </div>
+      <div class="row2">
+        <div><label for="veOwner">負責人</label><input id="veOwner" autocomplete="off"></div>
+        <div><label for="veRep">聯絡人／業務姓名</label><input id="veRep" autocomplete="name"></div>
+      </div>
+
+      <div class="form-section-title">電話與聯絡方式</div>
+      <div class="row2">
+        <div><label for="veTel">訂貨電話</label><input id="veTel" type="tel" inputmode="tel" autocomplete="tel" placeholder="02-2392-3410"></div>
+        <div><label for="veTel2">公司電話</label><input id="veTel2" type="tel" inputmode="tel" placeholder="可填第二支電話"></div>
+      </div>
+      <div class="row2">
+        <div><label for="veMobile">行動電話</label><input id="veMobile" type="tel" inputmode="tel"></div>
+        <div><label for="veFax">傳真</label><input id="veFax" type="tel" inputmode="tel"></div>
+      </div>
+      <label for="veAddr">地址</label>
+      <input id="veAddr" autocomplete="street-address">
+      <div class="row2">
+        <div><label for="veEmail">Email</label><input id="veEmail" type="email" inputmode="email" autocomplete="email"></div>
+        <div><label for="veLine">LINE ID</label><input id="veLine" autocomplete="off"></div>
+      </div>
+      <label for="veWebsite">網址</label>
+      <input id="veWebsite" type="url" inputmode="url" placeholder="https://">
+
+      <div class="form-section-title">叫貨與退貨備註</div>
+      <div class="row2">
+        <div><label for="veDays">送貨日</label><input id="veDays" placeholder="例：週二、週五"></div>
+        <div><label for="veMinAmt">最低訂購量／金額</label><input id="veMinAmt"></div>
+      </div>
+      <div class="row2">
+        <div><label for="veRetDays">效期前幾天內可退</label><input id="veRetDays" type="number" inputmode="numeric" min="0" placeholder="不可退填 0"></div>
+        <div><label for="veRetNote">退貨條件</label><input id="veRetNote" placeholder="例：整箱才收"></div>
+      </div>
+      <label for="veNote">其他備註</label>
+      <textarea id="veNote" rows="3" placeholder="對帳日、折扣條件、訂購專線等"></textarea>
+    </div>
+    <div class="app-dialog-actions">
+      <button class="btn-line" onclick="closeVendorModal()">取消</button>
+      <button class="btn-main" onclick="saveVendorForm()">✓ 儲存廠商資料</button>
+    </div>
+  </div>
+</div>
+
 <div id="doneModal" class="hidden" style="position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px;">
   <div style="background:var(--card);border-radius:16px;padding:18px;max-width:360px;width:100%;">
     <h2 style="margin:0 0 4px;font-size:16px;">結案處理</h2>
@@ -1520,7 +1623,7 @@ async function initCamCtrls(){
   try{
     const caps = scanner.getRunningTrackCapabilities();
     if(caps && caps.zoom){ camZoomCaps = caps.zoom;
-      await applyZoom(Math.min(2, camZoomCaps.max)); } // 預設2倍,小條碼更好掃
+      await applyZoom(1); } // 預設1倍；裝置不支援時由 applyZoom 自動限制在可用範圍
   }catch(e){}
 }
 async function applyZoom(z){
@@ -1714,7 +1817,7 @@ function openForm(i){
     + (diff===null?'':(diff===0?'(與帳面相符 ✓)':`(與帳面差 <b>${diff>0?'+':''}${diff}</b>,記得回 POS 修正)`))
     + (currentProd.shelf?`<br>📍 貨架 <b>${esc(currentProd.shelf)}</b>`:'')
     + (currentProd.cat?`　🏷️ ${esc(currentProd.cat)}`:'')
-    + (currentProd.vendor?`<br>🏭 ${esc(currentProd.vendor)}${(vendors[currentProd.vendor]&&vendors[currentProd.vendor].tel)?` <a href="tel:${esc(vendors[currentProd.vendor].tel)}">📞</a>`:''}`:'')
+    + (currentProd.vendor?`<br>🏭 ${esc(currentProd.vendor)}${vendorPhone(vendors[currentProd.vendor])?` <a href="tel:${esc(vendorPhone(vendors[currentProd.vendor]))}">📞 ${esc(vendorPhone(vendors[currentProd.vendor]))}</a>`:''}`:'')
     + ((currentProd.vendorAlt&&currentProd.vendorAlt.length)?`<br><span class="tiny">也曾向:${currentProd.vendorAlt.slice(0,3).map(esc).join('、')}</span>`:'')
     + (currentProd.flags&&currentProd.flags.length?`<br>${flagBadges(currentProd)}`:'');
   const ob = document.getElementById('btnOrder');
@@ -1761,15 +1864,32 @@ function renderDoneBatches(){
       }).join('')
     : '';
 }
-async function editQty(rid){
+let qtyEditRid = null;
+function editQty(rid){
   const r = records.find(x=>x.rid===rid);
   if(!r) return;
-  const v = prompt(`修改數量 — ${r.name}\n批號 ${r.batch||'(未填)'}｜效期 ${r.expiry}`, r.qty);
-  if(v===null) return;
-  const n = Number(v);
+  qtyEditRid = rid;
+  document.getElementById('qtyModalMeta').textContent = `${r.name}｜批號 ${r.batch||'(未填)'}｜效期 ${r.expiry}`;
+  const input = document.getElementById('qtyEditInput');
+  input.value = r.qty;
+  document.getElementById('qtyModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(()=>{ input.focus(); input.select(); });
+}
+function closeQtyModal(){
+  document.getElementById('qtyModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  qtyEditRid = null;
+}
+async function confirmQtyEdit(){
+  const r = records.find(x=>x.rid===qtyEditRid);
+  if(!r){ closeQtyModal(); return; }
+  const raw = document.getElementById('qtyEditInput').value.trim();
+  const n = Number(raw);
   if(isNaN(n) || n < 0){ toast('請輸入 0 以上的數字'); return; }
   r.qty = n; touch(r);
   await sSet('pos-records', JSON.stringify(records));
+  closeQtyModal();
   renderDoneBatches(); refreshAll(); renderToday();
   toast('✓ 數量已改為 '+n);
 }
@@ -1993,7 +2113,7 @@ function refreshShelfList(){
   const set = [...new Set(DB.map(p=>p.shelf).filter(Boolean))].sort();
   dl.innerHTML = set.map(s=>`<option>${esc(s)}</option>`).join('');
   const vl = document.getElementById('vendorList');
-  if(vl){ vl.innerHTML = [...new Set(DB.map(p=>p.vendor).filter(Boolean))].sort().map(s=>`<option>${esc(s)}</option>`).join(''); }
+  if(vl){ vl.innerHTML = vendorNames().map(s=>`<option>${esc(s)}</option>`).join(''); }
 }
 function nextProdId(){
   let mx = 0;
@@ -2916,19 +3036,25 @@ function backupData(){
 /* ================= 匯出 ================= */
 function exportXlsx(){
   if(!records.length){ toast('還沒有記錄可匯出唷'); return; }
-  const detail = records.map(r=>({
-    '編號':r.pid,'條碼':r.bc,'名稱':r.name,'單位':r.unit,
-    '分類':(DB.find(p=>p.id===r.pid)||{}).cat||'','貨架':(DB.find(p=>p.id===r.pid)||{}).shelf||'',
-    '批號':r.batch,'效期':r.expiry,'數量':r.qty,'登記時間':r.ts,
-    '登記人':r.by||'',
-    '處理狀態':r.done?('已處理 '+(r.doneTs||'')):'',
-    '處理方式':({expired:'過期銷毀',sold:'已售出/用完',return:'退貨廠商',other:'其他'})[r.doneWay]||'',
-    '損失金額':r.loss||''
-  }));
+  const detail = records.map(r=>{
+    const p = DB.find(x=>x.id===r.pid) || {};
+    const vi = vendorExportInfo(p);
+    return {
+      '編號':r.pid,'條碼':r.bc,'名稱':r.name,'單位':r.unit,'分類':p.cat||'','貨架':p.shelf||'',
+      '廠商名稱':vi.name,'聯絡電話':vi.phone,
+      '批號':r.batch,'效期':r.expiry,'數量':r.qty,'登記時間':r.ts,'登記人':r.by||'',
+      '處理狀態':r.done?('已處理 '+(r.doneTs||'')):'',
+      '處理方式':({expired:'過期銷毀',sold:'已售出/用完',return:'退貨廠商',other:'其他'})[r.doneWay]||'',
+      '損失金額':r.loss||''
+    };
+  });
   const groups = {};
   for(const r of records){
     const k = r.pid+'|'+r.name;
-    if(!groups[k]) groups[k]={'編號':r.pid,'名稱':r.name,'單位':r.unit,'批次數':0,'總數量':0,'最近效期':''};
+    if(!groups[k]){
+      const vi = vendorExportInfo(DB.find(x=>x.id===r.pid)||{});
+      groups[k]={'編號':r.pid,'名稱':r.name,'單位':r.unit,'廠商名稱':vi.name,'聯絡電話':vi.phone,'批次數':0,'總數量':0,'最近效期':''};
+    }
     const g = groups[k];
     g['批次數']++; g['總數量']+=r.qty;
     if(!g['最近效期'] || r.expiry < g['最近效期']) g['最近效期']=r.expiry;
@@ -2989,8 +3115,10 @@ function exportMonthly(){
       : [{'操作者':'無資料'}]), '操作者統計');
   // 待處理清單
   const a = buildAlerts();
-  const pend = [...a.past, ...a.m1, ...a.m3].map(r=>({
-    '名稱':r.name,'批號':r.batch,'效期':r.expiry,'剩餘天數':r.days,'數量':r.qty}));
+  const pend = [...a.past, ...a.m1, ...a.m3].map(r=>{
+    const vi = vendorExportInfo(DB.find(x=>x.id===r.pid)||{});
+    return {'名稱':r.name,'廠商名稱':vi.name,'聯絡電話':vi.phone,'批號':r.batch,'效期':r.expiry,'剩餘天數':r.days,'數量':r.qty};
+  });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
     pend.length?pend:[{'名稱':'目前無待處理項目'}]), '待處理清單');
   saveWorkbook(wb, `藥局月報_${ym.replace('/','')}.xlsx`);
@@ -3682,19 +3810,23 @@ function voiceExpiry(){
       got = applyVoiceDate(e.results[0][i].transcript);
     }
     btn.textContent = '🎙️ 唸效期';
-    if(!got) toast('聽不太懂,可以說「2027年9月」或「2027 9 30」');
+    if(!got) toast('聽不太懂,可以直接說「20280930」');
   };
   rec.onerror = ()=>{ btn.textContent='🎙️ 唸效期'; toast('語音辨識失敗,請確認麥克風權限'); };
   rec.onend = ()=>{ btn.textContent='🎙️ 唸效期'; };
-  try{ rec.start(); toast('請說效期,例如「2027年9月30日」'); }
+  try{ rec.start(); toast('請直接說 8 碼效期,例如「20280930」'); }
   catch(e){ btn.textContent='🎙️ 唸效期'; }
 }
-function applyVoiceDate(text){
+function normalizeVoiceExpiry(text){
   const zh = {'零':'0','〇':'0','一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};
   let s = String(text||'');
+  s = s.replace(/[０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-65248));
   s = s.replace(/[零〇一二三四五六七八九]/g, c=>zh[c]);
+  // 語音辨識常把 8 碼日期拆成空格或標點；合併後優先判讀 YYYYMMDD / YYYYMM。
+  const compact = s.replace(/\D/g,'');
+  if(/^\d{8}$/.test(compact) || /^\d{6}$/.test(compact)) return normalizeExpiryInput(compact);
   const nums = s.match(/\d+/g);
-  if(!nums || !nums.length) return false;
+  if(!nums || !nums.length) return '';
   let y=null, m=null, d=null;
   const ym = s.match(/(\d{2,4})\s*年/); const mm = s.match(/(\d{1,2})\s*月/); const dd = s.match(/(\d{1,2})\s*[日號]/);
   if(ym) y = +ym[1]; if(mm) m = +mm[1]; if(dd) d = +dd[1];
@@ -3704,11 +3836,15 @@ function applyVoiceDate(text){
     else if(String(parts[0]).length<=2 && parts.length>=2){ y = 2000 + parts[0]; m = parts[1]; d = parts[2]; }
   }
   if(y!==null && y < 100) y += 2000;
-  if(y===null || !m || m<1 || m>12) return false;
+  if(y===null || !m || m<1 || m>12) return '';
   if(d && (d<1 || d>31)) d = null;
-  setExpMode(d ? 'd' : 'm');
-  setExpiryParts(String(y), String(m).padStart(2,'0'), d?String(d).padStart(2,'0'):'');
-  toast('✓ 已填入 '+y+'/'+String(m).padStart(2,'0')+(d?'/'+String(d).padStart(2,'0'):''));
+  return normalizeExpiryInput(`${y}/${m}${d?'/'+d:''}`);
+}
+function applyVoiceDate(text){
+  const value = normalizeVoiceExpiry(text);
+  if(!value) return false;
+  applyExpiryString(value);
+  toast('✓ 已填入 '+value);
   return true;
 }
 function renderPro(){ renderTrend(); renderLoss(); renderCamps(); renderSnaps(); renderRisk(); renderStale(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); }
@@ -4125,13 +4261,14 @@ function exportReturns(){
   const g = returnsByVendor();
   for(const v of Object.keys(g)){
     const safe = v.replace(/[\\\/\?\*\[\]:]/g,'_').slice(0,28);
+    const phone = vendorPhone(vendors[v]||{});
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(g[v].map(o=>({
-      '品名':o.name,'批號':o.batch,'效期':o.expiry,'退貨數量':o.retQty,'單位':o.unit,
+      '廠商名稱':v,'聯絡電話':phone,'品名':o.name,'批號':o.batch,'效期':o.expiry,'退貨數量':o.retQty,'單位':o.unit,
       '進價':o.price||'','小計':(Number(o.retQty)||0)*(Number(o.price)||0)||''
     }))), safe);
   }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(returnList.map(o=>({
-    '廠商':o.vendor,'品名':o.name,'批號':o.batch,'效期':o.expiry,'退貨數量':o.retQty,
+    '廠商':o.vendor,'聯絡電話':vendorPhone(vendors[o.vendor]||{}),'品名':o.name,'批號':o.batch,'效期':o.expiry,'退貨數量':o.retQty,
     '單位':o.unit,'進價':o.price||'','小計':(Number(o.retQty)||0)*(Number(o.price)||0)||'','登記人':o.by||''
   }))), '全部彙總');
   const d=new Date();
@@ -4238,6 +4375,12 @@ function saveVendors(){ try{ localStorage.setItem('pos-vendors', JSON.stringify(
 function vendorNames(){
   return [...new Set([...Object.keys(vendors), ...DB.map(p=>p.vendor).filter(Boolean)])].sort();
 }
+function vendorPhone(d){ return String((d && (d.tel || d.mobile || d.tel2)) || '').trim(); }
+function vendorExportInfo(p){
+  const name = String((p && p.vendor) || '').trim();
+  const d = vendors[name] || {};
+  return {name, phone:vendorPhone(d)};
+}
 function renderVendors(){
   const box = document.getElementById('vendorBox');
   if(!box) return;
@@ -4249,42 +4392,76 @@ function renderVendors(){
         return `<div class="rec-group">
           <div class="rec-head"><span class="nm">🏭 ${esc(v)}</span><span class="cnt">${n} 品項</span></div>
           <div class="muted" style="font-size:12.5px;margin-top:3px">
-            ${d.tel?'📞 '+esc(d.tel):'<span style="color:#b26a00">未填電話</span>'}
-            ${d.mobile&&d.mobile!==d.tel?'｜📱 '+esc(d.mobile):''}
-            ${d.rep?'｜'+esc(d.rep):''}${d.line?'｜LINE '+esc(d.line):''}
+            ${d.no?'編號 '+esc(d.no):''}${d.short?'｜簡稱 '+esc(d.short):''}${d.category?'｜'+esc(d.category):''}
+            ${(d.no||d.short||d.category)?'<br>':''}
+            ${vendorPhone(d)?'📞 '+esc(vendorPhone(d)):'<span style="color:#b26a00">未填電話</span>'}
+            ${d.tel2&&d.tel2!==vendorPhone(d)?'｜☎️ '+esc(d.tel2):''}
+            ${d.mobile&&d.mobile!==vendorPhone(d)?'｜📱 '+esc(d.mobile):''}
+            ${d.fax?'｜傳真 '+esc(d.fax):''}${d.rep?'｜'+esc(d.rep):''}${d.line?'｜LINE '+esc(d.line):''}
+            ${(d.taxId||d.owner)?'<br>':''}${d.taxId?'統編 '+esc(d.taxId):''}${d.owner?'｜負責人 '+esc(d.owner):''}
+            ${d.email?'<br>✉️ '+esc(d.email):''}${d.website?'｜🌐 '+esc(d.website):''}
             ${d.retDays?'<br>🔄 效期前 '+esc(d.retDays)+' 天內可退':''}${d.retNote?'('+esc(d.retNote)+')':''}
             ${d.minAmt?'<br>最低訂購 '+esc(d.minAmt):''}${d.days?'｜送貨日 '+esc(d.days):''}
             ${d.addr?'<br>'+esc(d.addr):''}${d.note?'<br>'+esc(d.note):''}</div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            ${d.tel?`<a class="btn-sm btn-line" style="text-decoration:none;display:inline-block" href="tel:${esc(d.tel)}">📞 撥號</a>`:''}
+            ${vendorPhone(d)?`<a class="btn-sm btn-line" style="text-decoration:none;display:inline-block" href="tel:${esc(vendorPhone(d))}">📞 ${esc(vendorPhone(d))}</a>`:''}
             <button class="btn-sm btn-line" onclick="editVendor('${esc(v).replace(/'/g,"\\'")}')">✏️ 編輯聯絡資訊</button>
           </div></div>`;
       }).join('')
     : '<p class="muted center" style="padding:12px 0">尚未設定廠商。<br>請按上方「新增廠商資料」直接建立。</p>');
 }
-function addVendor(){
-  const v = prompt('新增廠商名稱');
-  if(!v || !v.trim()) return;
-  const name = v.trim();
-  if(!vendors[name]) vendors[name] = {};
-  saveVendors(); renderVendors(); editVendor(name);
-}
-function editVendor(v){
+let vendorEditOriginal = '';
+let vendorPickTarget = '';
+const VENDOR_FORM_FIELDS = {
+  no:'veNo', short:'veShort', category:'veCategory', taxId:'veTaxId', owner:'veOwner', rep:'veRep',
+  tel:'veTel', tel2:'veTel2', mobile:'veMobile', fax:'veFax', addr:'veAddr', email:'veEmail',
+  line:'veLine', website:'veWebsite', days:'veDays', minAmt:'veMinAmt', retDays:'veRetDays',
+  retNote:'veRetNote', note:'veNote'
+};
+function addVendor(targetId=''){ openVendorEditor('', targetId); }
+function editVendor(v){ openVendorEditor(v, ''); }
+function openVendorEditor(v='', targetId=''){
+  vendorEditOriginal = v;
+  vendorPickTarget = targetId;
   const d = vendors[v] || {};
-  const tel = prompt(`【${v}】訂貨電話`, d.tel||''); if(tel===null) return;
-  const mobile = prompt(`【${v}】行動電話`, d.mobile||''); if(mobile===null) return;
-  const rep = prompt(`【${v}】業務姓名`, d.rep||''); if(rep===null) return;
-  const line = prompt(`【${v}】LINE ID`, d.line||''); if(line===null) return;
-  const addr = prompt(`【${v}】地址`, d.addr||''); if(addr===null) return;
-  const retDays = prompt(`【${v}】效期前幾天內可退貨?(數字,不可退填 0)`, d.retDays||''); if(retDays===null) return;
-  const retNote = prompt(`【${v}】退貨條件備註(例:整箱才收)`, d.retNote||''); if(retNote===null) return;
-  const minAmt = prompt(`【${v}】最低訂購量 / 金額`, d.minAmt||''); if(minAmt===null) return;
-  const days = prompt(`【${v}】送貨日(例:週二、週五)`, d.days||''); if(days===null) return;
-  const note = prompt(`【${v}】備註(對帳日、折扣條件…)`, d.note||''); if(note===null) return;
-  vendors[v] = Object.assign({}, d, {tel:tel.trim(), mobile:mobile.trim(), rep:rep.trim(), line:line.trim(), addr:addr.trim(),
-    retDays:retDays.trim(), retNote:retNote.trim(), minAmt:minAmt.trim(), days:days.trim(), note:note.trim()});
-  saveVendors(); renderVendors(); renderBuy();
-  toast('✓ 已更新 '+v+' 的聯絡資訊');
+  document.getElementById('vendorModalTitle').textContent = v ? '🏭 編輯廠商基本資料' : '🏭 新增廠商基本資料';
+  document.getElementById('veName').value = v;
+  for(const [key,id] of Object.entries(VENDOR_FORM_FIELDS)) document.getElementById(id).value = d[key] || '';
+  document.getElementById('vendorModal').classList.remove('hidden');
+  document.body.classList.add('modal-open');
+  requestAnimationFrame(()=>document.getElementById('veName').focus());
+}
+function closeVendorModal(){
+  document.getElementById('vendorModal').classList.add('hidden');
+  document.body.classList.remove('modal-open');
+  vendorEditOriginal = '';
+  vendorPickTarget = '';
+}
+async function saveVendorForm(){
+  const name = document.getElementById('veName').value.trim();
+  if(!name){ toast('廠商正式名稱是必填的'); document.getElementById('veName').focus(); return; }
+  if(name !== vendorEditOriginal && vendors[name] && !confirm(`「${name}」已存在,要用目前表單更新它嗎?`)) return;
+  const data = {};
+  for(const [key,id] of Object.entries(VENDOR_FORM_FIELDS)) data[key] = document.getElementById(id).value.trim();
+  const oldData = vendorEditOriginal ? (vendors[vendorEditOriginal]||{}) : {};
+  vendors[name] = Object.assign({}, oldData, vendors[name]||{}, data);
+  let renamed = false;
+  if(vendorEditOriginal && vendorEditOriginal !== name){
+    delete vendors[vendorEditOriginal];
+    for(const p of DB){
+      if(p.vendor === vendorEditOriginal){ p.vendor = name; touch(p); renamed = true; }
+      if(Array.isArray(p.vendorAlt) && p.vendorAlt.includes(vendorEditOriginal)){
+        p.vendorAlt = [...new Set(p.vendorAlt.map(x=>x===vendorEditOriginal?name:x))]; touch(p); renamed = true;
+      }
+    }
+  }
+  saveVendors();
+  if(renamed) await sSet('pos-products', JSON.stringify(DB));
+  const targetId = vendorPickTarget;
+  closeVendorModal();
+  refreshShelfList(); renderVendors(); renderBuy(); renderAlert();
+  if(targetId && document.getElementById(targetId)) document.getElementById(targetId).value = name;
+  toast('✓ 已儲存廠商:'+name);
 }
 
 /* ================= 低庫存 / 叫貨清單 ================= */
@@ -4414,12 +4591,14 @@ function exportOrder(){
   // 每個廠商一張工作表
   for(const v of Object.keys(g)){
     const safe = v.replace(/[\\\/\?\*\[\]:]/g,'_').slice(0,28);
+    const phone = vendorPhone(vendors[v]||{});
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(g[v].map(o=>({
-      '品名':o.name,'分類':o.cat,'貨架':o.shelf,'目前庫存':o.qty,'單位':o.unit,'叫貨數量':o.orderQty||''
+      '廠商名稱':v,'聯絡電話':phone,'品名':o.name,'分類':o.cat,'貨架':o.shelf,'目前庫存':o.qty,'單位':o.unit,'叫貨數量':o.orderQty||''
     }))), safe);
   }
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(orderList.map(o=>({
-    '品名':o.name,'廠商':(DB.find(x=>x.id===o.pid)||{}).vendor||'','分類':o.cat,'貨架':o.shelf,
+    '品名':o.name,'廠商':(DB.find(x=>x.id===o.pid)||{}).vendor||'',
+    '聯絡電話':vendorExportInfo(DB.find(x=>x.id===o.pid)||{}).phone,'分類':o.cat,'貨架':o.shelf,
     '目前庫存':o.qty,'單位':o.unit,'叫貨數量':o.orderQty||''
   }))), '全部彙總');
   const d=new Date();
@@ -4867,8 +5046,9 @@ function vendorLine(p, r){
       ? ` · <b style="color:var(--brand-dk)">可退貨(效期前 ${retDays} 天內)</b>`
       : ` · <span style="color:#b26a00">超過退貨期限,建議促銷</span>`;
   }else if(d.retDays === '0'){ ret = ' · <span style="color:#b26a00">此廠商不收退貨</span>'; }
+  const phone = vendorPhone(d);
   return `<div class="dt" style="margin-top:4px">🏭 ${esc(p.vendor)}${d.rep?'('+esc(d.rep)+')':''}${ret}
-    ${d.tel?`<a class="btn-sm btn-line" style="text-decoration:none;display:inline-block;margin-left:6px" href="tel:${esc(d.tel)}">📞 撥號</a>`:''}</div>`;
+    ${phone?`<a class="btn-sm btn-line" style="text-decoration:none;display:inline-block;margin-left:6px" href="tel:${esc(phone)}">📞 ${esc(phone)}</a>`:''}</div>`;
 }
 function renderAlert(){
   const a = buildAlerts();
@@ -4991,8 +5171,10 @@ function exportAlert(){
   const rows = [];
   for(const t of TIERS){
     for(const r of a[t.key]){
+      const vi = vendorExportInfo(DB.find(x=>x.id===r.pid)||{});
       rows.push({'警示等級':t.label,'編號':r.pid,'名稱':r.name,'批號':r.batch,
-        '效期':r.expiry,'剩餘天數':r.days,'數量':r.qty,'單位':r.unit});
+        '效期':r.expiry,'剩餘天數':r.days,'數量':r.qty,'單位':r.unit,
+        '廠商名稱':vi.name,'聯絡電話':vi.phone});
     }
   }
   const wb = XLSX.utils.book_new();

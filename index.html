@@ -122,6 +122,19 @@ label{font-size:13px; color:var(--ink2); font-weight:700; display:block; margin:
 .seg{display:flex; background:var(--bg); border-radius:10px; padding:3px; margin-top:4px;}
 .seg button{flex:1; padding:8px; font-size:14px; border-radius:8px; background:none; color:var(--ink2); font-weight:600;}
 .seg button.on{background:var(--card); color:var(--brand-dk); box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.expiry-fast-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-top:8px;align-items:stretch;}
+.expiry-input-shell{display:flex;align-items:center;gap:8px;margin:0;padding:0 12px;background:var(--card);border:1.5px solid var(--line);border-radius:12px;}
+.expiry-input-shell:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px rgba(15,138,109,.12);}
+.expiry-input-icon{font-size:20px;line-height:1;flex:0 0 auto;}
+.expiry-input-shell input{min-width:0;border:0!important;background:transparent!important;padding:13px 0!important;box-shadow:none!important;font-size:20px!important;font-variant-numeric:tabular-nums;letter-spacing:1px;}
+.expiry-input-shell input:focus{outline:none;}
+.expiry-mic{white-space:nowrap;padding:10px 14px;}
+.expiry-hint{margin:7px 2px 0;color:var(--ink2);font-size:12.5px;line-height:1.5;}
+.expiry-preview{margin-top:8px;padding:9px 11px;border-radius:10px;background:var(--bg);color:var(--ink2);font-size:13.5px;line-height:1.5;}
+.expiry-preview.valid{background:var(--brand-lt);color:var(--brand-dk);font-weight:700;}
+.expiry-preview.error{background:var(--red-lt);color:var(--red);font-weight:700;}
+.expiry-quick-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:8px;}
+.expiry-quick-grid .btn-sm{padding:8px 5px;white-space:nowrap;}
 .stat-row{display:flex; gap:10px; margin-bottom:12px;}
 .stat{flex:1; background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:12px; text-align:center;}
 .stat .num{font-size:24px; font-weight:800; color:var(--brand-dk);}
@@ -193,10 +206,14 @@ body.modal-open{overflow:hidden;}
   .progress-pill{ font-size:12px; }
   .seg button{ font-size:13px; padding:7px 4px; }
   .btn-sm{ padding:7px 10px; font-size:13px; }
+  .expiry-quick-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .expiry-quick-grid .btn-sm:nth-child(n+4){grid-column:span 1;}
 }
 @media (max-width:360px){
   .tabs button{ font-size:10px; }
   .btn-main, .btn-ghost{ font-size:15px; padding:12px; }
+  .expiry-fast-row{grid-template-columns:1fr;}
+  .expiry-mic{width:100%;}
 }
 
 
@@ -399,7 +416,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v9';
+    const KEEP = 'pos-expiry-v10';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -452,7 +469,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.4</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.5</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -605,20 +622,24 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 
       <label>效期</label>
       <div class="seg">
-        <button id="segM" onclick="setExpMode('m')">年/月</button>
-        <button id="segD" class="on" onclick="setExpMode('d')">年/月/日</button>
+        <button id="segM" onclick="setExpMode('m')">🗓️ 年／月</button>
+        <button id="segD" class="on" onclick="setExpMode('d')">📅 年／月／日</button>
       </div>
-      <div style="display:flex;gap:6px;margin-top:8px;">
-        <select id="fExpY" style="flex:1.2;"></select>
-        <select id="fExpMo" style="flex:1;"></select>
-        <select id="fExpDay" style="flex:1;"></select>
+      <div class="expiry-fast-row">
+        <label class="expiry-input-shell" for="fExpDigits">
+          <span class="expiry-input-icon" aria-hidden="true">🍀</span>
+          <input id="fExpDigits" type="text" inputmode="numeric" enterkeyhint="next" maxlength="8" placeholder="例：20280930" autocomplete="off" oninput="handleExpiryDigits(this)">
+        </label>
+        <button class="btn-sm btn-line expiry-mic" id="micBtn" onclick="voiceExpiry()">🎙️ 語音</button>
       </div>
-      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-        <button class="btn-sm btn-line" onclick="quickExp(1)">+1年</button>
-        <button class="btn-sm btn-line" onclick="quickExp(2)">+2年</button>
-        <button class="btn-sm btn-line" onclick="quickExp(3)">+3年</button>
+      <p class="expiry-hint" id="fExpHint">直接輸入 8 碼，不用加斜線，例如 20280930</p>
+      <div class="expiry-preview" id="fExpPreview" aria-live="polite">🐣 等待輸入效期</div>
+      <div class="expiry-quick-grid">
+        <button class="btn-sm btn-line" onclick="quickExp(1)">🌱 +1年</button>
+        <button class="btn-sm btn-line" onclick="quickExp(2)">🌷 +2年</button>
+        <button class="btn-sm btn-line" onclick="quickExp(3)">🌟 +3年</button>
         <button class="btn-sm btn-line" onclick="sameAsLast()">📋 同上一筆</button>
-        <button class="btn-sm btn-line" id="micBtn" onclick="voiceExpiry()">🎙️ 唸效期</button>
+        <button class="btn-sm btn-line" type="button" onclick="document.getElementById('fExpDigits').focus()">⌨️ 手動輸入</button>
       </div>
 
       <div class="row2">
@@ -911,23 +932,6 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
     </div>
 
     <div class="task-panel" data-task-panel="tools">
-      <div class="card" style="border:2px solid #b3261e">
-        <h2 style="color:#b3261e">🚨 藥品回收批號比對</h2>
-        <p class="muted" style="margin:0 0 8px;font-size:13px">收到公會/食藥署回收公文時,貼上品名與批號,立刻查出店裡有沒有這批貨</p>
-        <label>藥品名稱(可只打關鍵字)</label>
-        <input id="rcName" placeholder="例:保你爾 或 保你爾膜衣錠8毫克" autocomplete="off">
-        <label>回收批號(多個批號用空格或逗號分隔)</label>
-        <input id="rcBatch" placeholder="例:2KA31 2KA32" autocomplete="off">
-        <div class="row2" style="margin-top:12px">
-          <button class="btn-line" style="padding:12px" onclick="clearRecall()">清空</button>
-          <button class="btn-main" style="padding:12px;background:#b3261e" onclick="checkRecall()">🔍 立即比對</button>
-        </div>
-        <div id="rcResult"></div>
-        <details style="margin-top:10px">
-          <summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📋 回收處理紀錄(<span id="rcLogCount">0</span>)</summary>
-          <div id="rcLog"></div>
-        </details>
-      </div>
       <div class="card" style="border:2px solid var(--brand)">
         <h2>🏭 廠商資料管理</h2>
         <p class="muted" style="margin:0 0 8px;font-size:13px">選擇系統裡已有的廠商即可修改聯絡資料，也可以直接建立新廠商。</p>
@@ -944,6 +948,23 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
         <h2>🏷️ 自製商品條碼</h2>
         <p class="muted" style="margin:0 0 8px;font-size:13px">分裝品、自製包等沒有條碼的商品,可產生標籤貼上後掃描</p>
         <button class="btn-main" onclick="document.getElementById('bcModal').classList.remove('hidden');openBarcodeModal()">🏷️ 產生條碼標籤</button>
+      </div>
+      <div class="card" style="border:2px solid #b3261e">
+        <h2 style="color:#b3261e">🚨 藥品回收批號比對</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">收到公會/食藥署回收公文時,貼上品名與批號,立刻查出店裡有沒有這批貨</p>
+        <label>藥品名稱(可只打關鍵字)</label>
+        <input id="rcName" placeholder="例:保你爾 或 保你爾膜衣錠8毫克" autocomplete="off">
+        <label>回收批號(多個批號用空格或逗號分隔)</label>
+        <input id="rcBatch" placeholder="例:2KA31 2KA32" autocomplete="off">
+        <div class="row2" style="margin-top:12px">
+          <button class="btn-line" style="padding:12px" onclick="clearRecall()">清空</button>
+          <button class="btn-main" style="padding:12px;background:#b3261e" onclick="checkRecall()">🔍 立即比對</button>
+        </div>
+        <div id="rcResult"></div>
+        <details style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📋 回收處理紀錄(<span id="rcLogCount">0</span>)</summary>
+          <div id="rcLog"></div>
+        </details>
       </div>
     </div>
 
@@ -1835,7 +1856,7 @@ function openForm(i){
   const ob = document.getElementById('btnOrder');
   if(ob) ob.textContent = orderList.some(o=>o.pid===currentProd.id) ? '✓ 已在叫貨清單(點此移除)' : '🛒 加入叫貨清單';
   document.getElementById('fBatch').value='';
-  initExpirySelects();
+  initExpiryInput();
   renderUnitSel(currentProd.unit||'');
   setExpMode('d');
   clearExpiry();
@@ -1993,33 +2014,73 @@ function setExpMode(m){
   expMode = m;
   document.getElementById('segM').classList.toggle('on', m==='m');
   document.getElementById('segD').classList.toggle('on', m==='d');
-  document.getElementById('fExpDay').classList.toggle('hidden', m!=='d');
-  if(m!=='d') document.getElementById('fExpDay').value='';
+  const input = document.getElementById('fExpDigits');
+  if(!input) return;
+  input.maxLength = m==='d' ? 8 : 6;
+  input.placeholder = m==='d' ? '例：20280930' : '例：202809';
+  input.setAttribute('aria-label', m==='d' ? '效期八碼數字' : '效期六碼年月');
+  input.value = input.value.replace(/\D/g,'').slice(0, input.maxLength);
+  const hint = document.getElementById('fExpHint');
+  if(hint) hint.textContent = m==='d'
+    ? '直接輸入 8 碼，不用加斜線，例如 20280930'
+    : '直接輸入 6 碼，不用加斜線，例如 202809';
+  renderExpiryPreview();
 }
-function initExpirySelects(){
-  const y = document.getElementById('fExpY'), mo = document.getElementById('fExpMo'), dd = document.getElementById('fExpDay');
-  if(y.options.length) return; // 只建一次
-  const nowY = new Date().getFullYear();
-  y.innerHTML = '<option value="">年</option>' +
-    Array.from({length:17}, (_,i)=>nowY-4+i).map(v=>`<option value="${v}">${v} 年</option>`).join('');
-  mo.innerHTML = '<option value="">月</option>' +
-    Array.from({length:12}, (_,i)=>String(i+1).padStart(2,'0')).map(v=>`<option value="${v}">${+v} 月</option>`).join('');
-  dd.innerHTML = '<option value="">日</option>' +
-    Array.from({length:31}, (_,i)=>String(i+1).padStart(2,'0')).map(v=>`<option value="${v}">${+v} 日</option>`).join('');
+function initExpiryInput(){
+  const btn = document.getElementById('micBtn');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(btn){
+    btn.disabled = !SR;
+    btn.textContent = SR ? '🎙️ 語音' : '⌨️ 請打字';
+    btn.title = SR ? '說出 20280930 或 2028年9月30日' : '此瀏覽器沒有可用的語音辨識，仍可直接輸入數字';
+  }
+  renderExpiryPreview();
 }
 function setExpiryParts(y, m, d){
-  initExpirySelects();
-  document.getElementById('fExpY').value = y || '';
-  document.getElementById('fExpMo').value = m ? String(m).padStart(2,'0') : '';
-  document.getElementById('fExpDay').value = d ? String(d).padStart(2,'0') : '';
+  const input = document.getElementById('fExpDigits');
+  if(!input) return;
+  input.value = y && m
+    ? String(y) + String(m).padStart(2,'0') + (expMode==='d' && d ? String(d).padStart(2,'0') : '')
+    : '';
+  renderExpiryPreview();
 }
 function clearExpiry(){ setExpiryParts('', '', ''); }
+function handleExpiryDigits(input){
+  const max = expMode==='d' ? 8 : 6;
+  input.value = input.value.replace(/\D/g,'').slice(0,max);
+  renderExpiryPreview();
+}
+function renderExpiryPreview(){
+  const input = document.getElementById('fExpDigits');
+  const box = document.getElementById('fExpPreview');
+  if(!input || !box) return;
+  const raw = input.value.replace(/\D/g,'');
+  const need = expMode==='d' ? 8 : 6;
+  box.classList.remove('valid','error');
+  if(!raw){ box.textContent = '🐣 等待輸入效期'; return; }
+  if(raw.length < need){ box.textContent = `🐾 還差 ${need-raw.length} 碼`; return; }
+  const value = normalizeExpiryInput(raw);
+  const parts = value ? value.split('/') : [];
+  const modeOK = expMode==='d' ? parts.length===3 : parts.length===2;
+  if(!value || !modeOK){
+    box.classList.add('error');
+    box.textContent = '⚠️ 日期不正確，請重新輸入';
+    return;
+  }
+  box.classList.add('valid');
+  box.textContent = expMode==='d'
+    ? `✅ ${parts[0]} 年 ${Number(parts[1])} 月 ${Number(parts[2])} 日`
+    : `✅ ${parts[0]} 年 ${Number(parts[1])} 月`;
+}
 function readExpiry(){
-  const y = document.getElementById('fExpY').value;
-  const m = document.getElementById('fExpMo').value;
-  const d = document.getElementById('fExpDay').value;
-  if(!y || !m) return '';
-  return (expMode==='d' && d) ? `${y}/${m}/${d}` : `${y}/${m}`;
+  const raw = document.getElementById('fExpDigits').value.replace(/\D/g,'');
+  const need = expMode==='d' ? 8 : 6;
+  if(raw.length!==need) return '';
+  const value = normalizeExpiryInput(raw);
+  if(!value) return '';
+  const parts = value.split('/');
+  if((expMode==='d' && parts.length!==3) || (expMode==='m' && parts.length!==2)) return '';
+  return value;
 }
 const COMMON_UNITS = ['盒','粒','排','罐','瓶','顆','包','支','片','條','入','個','組','劑','管','袋','抽','份'];
 function renderProdUnitSel(cur){
@@ -3811,7 +3872,7 @@ function renderStale(){
 /* ---- 語音輸入效期 ---- */
 function voiceExpiry(){
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ toast('這個瀏覽器不支援語音輸入,請改用 Chrome'); return; }
+  if(!SR){ toast('此裝置無法使用語音，請直接輸入效期數字'); return; }
   const rec = new SR();
   rec.lang = 'zh-TW'; rec.interimResults = false; rec.maxAlternatives = 3;
   const btn = document.getElementById('micBtn');
@@ -3821,13 +3882,13 @@ function voiceExpiry(){
     for(let i=0;i<e.results[0].length && !got;i++){
       got = applyVoiceDate(e.results[0][i].transcript);
     }
-    btn.textContent = '🎙️ 唸效期';
+    btn.textContent = '🎙️ 語音';
     if(!got) toast('聽不太懂,可以直接說「20280930」');
   };
-  rec.onerror = ()=>{ btn.textContent='🎙️ 唸效期'; toast('語音辨識失敗,請確認麥克風權限'); };
-  rec.onend = ()=>{ btn.textContent='🎙️ 唸效期'; };
+  rec.onerror = ()=>{ btn.textContent='🎙️ 語音'; toast('語音辨識失敗；可確認麥克風權限，或直接輸入數字'); };
+  rec.onend = ()=>{ btn.textContent='🎙️ 語音'; };
   try{ rec.start(); toast('請直接說 8 碼效期,例如「20280930」'); }
-  catch(e){ btn.textContent='🎙️ 唸效期'; }
+  catch(e){ btn.textContent='🎙️ 語音'; }
 }
 function normalizeVoiceExpiry(text){
   const zh = {'零':'0','〇':'0','一':'1','二':'2','三':'3','四':'4','五':'5','六':'6','七':'7','八':'8','九':'9','十':'10'};

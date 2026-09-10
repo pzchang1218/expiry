@@ -399,7 +399,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v8';
+    const KEEP = 'pos-expiry-v9';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -452,7 +452,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.3</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.4</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -927,6 +927,18 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
           <summary style="cursor:pointer;font-size:13px;color:var(--brand-dk);font-weight:700">📋 回收處理紀錄(<span id="rcLogCount">0</span>)</summary>
           <div id="rcLog"></div>
         </details>
+      </div>
+      <div class="card" style="border:2px solid var(--brand)">
+        <h2>🏭 廠商資料管理</h2>
+        <p class="muted" style="margin:0 0 8px;font-size:13px">選擇系統裡已有的廠商即可修改聯絡資料，也可以直接建立新廠商。</p>
+        <label for="toolVendorInput">搜尋／選擇系統內廠商</label>
+        <input id="toolVendorInput" list="toolVendorOptions" placeholder="輸入廠商名稱或關鍵字" autocomplete="off" oninput="renderToolVendorSummary()">
+        <datalist id="toolVendorOptions"></datalist>
+        <div id="toolVendorSummary" class="note" style="margin-top:9px"></div>
+        <div class="row2" style="margin-top:10px">
+          <button class="btn-line" style="padding:12px" onclick="editToolVendor()">✏️ 修改選取廠商</button>
+          <button class="btn-main" style="padding:12px" onclick="addVendor()">➕ 新增廠商資料</button>
+        </div>
       </div>
       <div class="card">
         <h2>🏷️ 自製商品條碼</h2>
@@ -3847,7 +3859,7 @@ function applyVoiceDate(text){
   toast('✓ 已填入 '+value);
   return true;
 }
-function renderPro(){ renderTrend(); renderLoss(); renderCamps(); renderSnaps(); renderRisk(); renderStale(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); }
+function renderPro(){ renderTrend(); renderLoss(); renderCamps(); renderSnaps(); renderRisk(); renderStale(); renderZoneSel(); renderZone(); renderZoneTable(); renderMargin(); renderRecallLog(); renderToolVendorPicker(); }
 
 /* ================= 自製條碼(Code128)列印 ================= */
 const C128 = ["11011001100","11001101100","11001100110","10010011000","10010001100","10001001100","10011001000","10011000100","10001100100","11001001000","11001000100","11000100100","10110011100","10011011100","10011001110","10111001100","10011101100","10011100110","11001110010","11001011100","11001001110","11011100100","11001110100","11101101110","11101001100","11100101100","11100100110","11101100100","11100110100","11100110010","11011011000","11011000110","11000110110","10100011000","10001011000","10001000110","10110001000","10001101000","10001100010","11010001000","11000101000","11000100010","10110111000","10110001110","10001101110","10111011000","10111000110","10001110110","11101110110","11010001110","11000101110","11011101000","11011100010","11011101110","11101011000","11101000110","11100010110","11101101000","11101100010","11100011010","11101111010","11001000010","11110001010","10100110000","10100001100","10010110000","10010000110","10000101100","10000100110","10110010000","10110000100","10011010000","10011000010","10000110100","10000110010","11000010010","11001010000","11110111010","11000010100","10001111010","10100111100","10010111100","10010011110","10111100100","10011110100","10011110010","11110100100","11110010100","11110010010","11011011110","11011110110","11110110110","10101111000","10100011110","10001011110","10111101000","10111100010","11110101000","11110100010","10111011110","10111101110","11101011110","11110101110","11010000100","11010010000","11010011100","1100011101011"];
@@ -4371,7 +4383,11 @@ try{ vendors = JSON.parse(localStorage.getItem('pos-vendors')||'{}'); }catch(e){
   }
   if(added){ try{ localStorage.setItem('pos-vendors', JSON.stringify(vendors)); }catch(e){} }
 })();
-function saveVendors(){ try{ localStorage.setItem('pos-vendors', JSON.stringify(vendors)); }catch(e){} }
+function saveVendors(){
+  try{ localStorage.setItem('pos-vendors', JSON.stringify(vendors)); }catch(e){}
+  if(typeof cloudSchedulePush==='function') cloudSchedulePush();
+  if(typeof markDirty==='function') markDirty();
+}
 function vendorNames(){
   return [...new Set([...Object.keys(vendors), ...DB.map(p=>p.vendor).filter(Boolean)])].sort();
 }
@@ -4409,6 +4425,52 @@ function renderVendors(){
           </div></div>`;
       }).join('')
     : '<p class="muted center" style="padding:12px 0">尚未設定廠商。<br>請按上方「新增廠商資料」直接建立。</p>');
+}
+function renderToolVendorPicker(preferred=''){
+  const input = document.getElementById('toolVendorInput');
+  const list = document.getElementById('toolVendorOptions');
+  if(!input || !list) return;
+  const names = vendorNames();
+  list.innerHTML = names.map(v=>`<option value="${esc(v)}"></option>`).join('');
+  if(preferred) input.value = preferred;
+  renderToolVendorSummary();
+}
+function renderToolVendorSummary(){
+  const input = document.getElementById('toolVendorInput');
+  const box = document.getElementById('toolVendorSummary');
+  if(!input || !box) return;
+  const names = vendorNames();
+  const name = input.value.trim();
+  if(!name){
+    box.innerHTML = names.length
+      ? `目前共有 <b>${names.length}</b> 家廠商。輸入公司名或業務姓名即可搜尋。`
+      : '目前尚無廠商資料，請按「新增廠商資料」建立第一家廠商。';
+    return;
+  }
+  if(!names.includes(name)){
+    const q = name.toLowerCase();
+    const matches = names.filter(v=>v.toLowerCase().includes(q));
+    box.innerHTML = matches.length
+      ? `找到 <b>${matches.length}</b> 家相符廠商，請從輸入時出現的建議清單選取。`
+      : '找不到這家廠商。若是新廠商，請按「新增廠商資料」。';
+    return;
+  }
+  const d = vendors[name] || {};
+  const phone = vendorPhone(d);
+  const itemCount = DB.filter(p=>p.vendor===name).length;
+  const details = [];
+  if(d.no) details.push('編號 '+esc(d.no));
+  if(d.rep) details.push('聯絡人 '+esc(d.rep));
+  if(phone) details.push('電話 '+esc(phone));
+  box.innerHTML = `<b>${esc(name)}</b><br>`+
+    `<span class="muted">${details.length ? details.join('｜')+'<br>' : ''}已連結 ${itemCount} 個商品</span>`;
+}
+function editToolVendor(){
+  const input = document.getElementById('toolVendorInput');
+  const name = input ? input.value.trim() : '';
+  if(!name){ toast('請先選擇要修改的廠商'); return; }
+  if(!vendorNames().includes(name)){ toast('請從建議清單選擇既有廠商'); return; }
+  editVendor(name);
 }
 let vendorEditOriginal = '';
 let vendorPickTarget = '';
@@ -4459,7 +4521,7 @@ async function saveVendorForm(){
   if(renamed) await sSet('pos-products', JSON.stringify(DB));
   const targetId = vendorPickTarget;
   closeVendorModal();
-  refreshShelfList(); renderVendors(); renderBuy(); renderAlert();
+  refreshShelfList(); renderVendors(); renderToolVendorPicker(name); renderBuy(); renderAlert();
   if(targetId && document.getElementById(targetId)) document.getElementById(targetId).value = name;
   toast('✓ 已儲存廠商:'+name);
 }

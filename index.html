@@ -351,22 +351,6 @@ input:focus,select:focus,textarea:focus{outline:3px solid rgba(13,150,117,.14);b
 .tabs .ico{display:grid;place-items:center;width:34px;height:30px;border-radius:11px;transition:.18s ease;}
 .tabs button.active .ico{color:#fff;background:linear-gradient(135deg,var(--brand),var(--coral));transform:translateY(-2px) rotate(-2deg);box-shadow:0 5px 12px rgba(13,150,117,.18);}
 
-/* 掃描首頁歡迎區：文字與角色是兩欄，不使用重疊定位。 */
-.cute-welcome{
-  display:grid;grid-template-columns:minmax(0,1fr) 100px;align-items:center;gap:10px;
-  min-height:124px;margin-bottom:12px;padding:14px 13px 10px 16px;
-  border-radius:24px 24px 24px 10px;color:#fff;
-  background:
-    radial-gradient(circle at 14px 14px,rgba(255,255,255,.12) 1.5px,transparent 2px) 0 0/22px 22px,
-    linear-gradient(135deg,#08745d,#12a481 65%,#46c8a3);
-  box-shadow:0 10px 25px rgba(8,116,93,.16);
-}
-.cute-welcome-copy{min-width:0;}
-.cute-welcome-copy h2{margin:0;color:#fff;font-size:20px;line-height:1.35;letter-spacing:.4px;}
-.cute-welcome-copy p{margin:7px 0 0;color:rgba(255,255,255,.78);font-size:10.5px;line-height:1.5;}
-.cute-helper{display:block;width:94px;height:108px;justify-self:end;filter:drop-shadow(0 7px 8px rgba(0,65,50,.16));pointer-events:none;}
-.cute-helper-note{display:block;margin-top:4px;color:#ffedaa;font-size:9.5px;font-weight:800;}
-#todayCard{border-radius:22px 22px 22px 9px!important;box-shadow:0 8px 22px rgba(8,105,83,.14);}
 #scanBox{border-radius:18px;background:#162b25;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);}
 #scanBox video{border-radius:18px;}
 
@@ -391,9 +375,6 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   .app-brand-sub{font-size:8.5px;}
   .app-actions{gap:4px;}
   .app-actions .header-action{width:29px;height:29px;font-size:14px;}
-  .cute-welcome{grid-template-columns:minmax(0,1fr) 86px;min-height:112px;padding-left:14px;}
-  .cute-welcome-copy h2{font-size:18px;}
-  .cute-helper{width:82px;height:95px;}
   .app-modal{padding:8px;align-items:flex-end;}
   .app-dialog{max-height:calc(100dvh - 8px);border-radius:22px 22px 10px 10px;}
   .app-dialog-head{padding:15px 14px 9px;}
@@ -405,9 +386,6 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   .app-brand-sub{display:none;}
   .app-brand-icon{width:30px;height:30px;}
   .app-actions .header-action{width:27px;height:27px;padding:0;}
-  .cute-welcome{grid-template-columns:minmax(0,1fr) 70px;gap:6px;min-height:104px;}
-  .cute-welcome-copy h2{font-size:16px;}
-  .cute-helper{width:68px;height:82px;}
 }
 </style>
 </head>
@@ -416,7 +394,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v10';
+    const KEEP = 'pos-expiry-v11';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -469,7 +447,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.5</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.6</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -490,41 +468,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 
   <!-- ============ 掃描登記 ============ -->
   <section id="viewScan" class="hidden">
-    <div class="cute-welcome">
-      <div class="cute-welcome-copy">
-        <h2>藥師早安，<br>開始今天的盤點吧！</h2>
-        <p>相機、效期與庫存工具都已準備好</p>
-        <span class="cute-helper-note">資料安全保存在這台裝置</span>
-      </div>
-      <svg class="cute-helper" viewBox="0 0 100 116" role="img" aria-label="可愛膠囊盤點小助手">
-        <ellipse cx="50" cy="110" rx="36" ry="4" fill="#056b57" opacity=".2"/>
-        <path d="M24 42c0-17 12-30 27-30s27 13 27 30v29c0 18-12 32-27 32S24 89 24 71z" fill="#fff9ed" stroke="#fff" stroke-width="3"/>
-        <path d="M24 47v-5c0-17 12-30 27-30s27 13 27 30v5z" fill="#f39a8e"/>
-        <rect x="43" y="17" width="16" height="16" rx="4" fill="#fff"/>
-        <path d="M51 20v10M46 25h10" stroke="#e96f68" stroke-width="3" stroke-linecap="round"/>
-        <ellipse cx="42" cy="55" rx="4" ry="5" fill="#40524d"/><ellipse cx="60" cy="55" rx="4" ry="5" fill="#40524d"/>
-        <circle cx="41" cy="54" r="1.2" fill="#fff"/><circle cx="59" cy="54" r="1.2" fill="#fff"/>
-        <ellipse cx="33" cy="65" rx="5" ry="2.4" fill="#f2a19f" opacity=".75"/><ellipse cx="69" cy="65" rx="5" ry="2.4" fill="#f2a19f" opacity=".75"/>
-        <path d="M45 64c3 4 8 4 11 0" fill="none" stroke="#6d625b" stroke-width="2" stroke-linecap="round"/>
-        <path d="M25 72c-8 5-11 12-11 20M77 72c7 4 10 9 12 16" fill="none" stroke="#fff9ed" stroke-width="7" stroke-linecap="round"/>
-        <rect x="72" y="73" width="23" height="29" rx="5" fill="#f5ce58" transform="rotate(5 72 73)"/>
-        <rect x="77" y="80" width="13" height="2.5" rx="1" fill="#9c7721" opacity=".5"/>
-        <rect x="77" y="86" width="11" height="2.5" rx="1" fill="#9c7721" opacity=".34"/>
-        <circle cx="89" cy="94" r="4" fill="#fff9ed"/>
-        <path d="M39 102l-4 8M63 102l4 8" stroke="#fff9ed" stroke-width="6" stroke-linecap="round"/>
-      </svg>
-    </div>
-    <div class="card" id="todayCard" style="background:linear-gradient(140deg,#0b6b55,#0f8a6d);color:#fff;border:none;">
-      <h2 style="color:rgba(255,255,255,.75)">🔔 今 日 待 辦</h2>
-      <div id="todayBox"></div>
-    </div>
     <div id="envWarn" class="hidden" style="background:#fdecea;border:2px solid #b3261e;border-radius:14px;padding:12px;margin-bottom:12px;font-size:14px;line-height:1.7;color:#7a1a14;"></div>
-    <div class="card" style="padding:10px 14px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="muted" style="white-space:nowrap">👤 目前操作者</span>
-        <select id="opSel" onchange="setOperator(this.value)" style="flex:1"></select>
-      </div>
-    </div>
     <div class="card">
       <h2>📷 掃描條碼</h2>
       <div id="scanBox"></div>

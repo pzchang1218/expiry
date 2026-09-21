@@ -394,7 +394,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v12';
+    const KEEP = 'pos-expiry-v13';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -447,7 +447,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.7</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.8</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -561,9 +561,6 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
       <div id="simWarn" class="hidden" style="background:var(--amber-lt);border:2px solid var(--amber);color:var(--amber);border-radius:12px;padding:10px;margin-bottom:10px;font-size:13px;line-height:1.7"></div>
       <div id="doneBatches"></div>
 
-      <label>批號</label>
-      <input id="fBatch" placeholder="例:A2405123(可留空)" autocomplete="off">
-
       <label>效期</label>
       <div class="seg">
         <button id="segM" onclick="setExpMode('m')">🗓️ 年／月</button>
@@ -590,6 +587,9 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
         <div><label>數量</label><input id="fQty" type="number" inputmode="numeric" placeholder="實際盤點數量"></div>
         <div><label>單位</label><select id="fUnit"></select></div>
       </div>
+
+      <label>批號</label>
+      <input id="fBatch" placeholder="例:A2405123(可留空)" autocomplete="off">
 
       <div class="row2" style="margin-top:14px">
         <button class="btn-line" onclick="closeForm()">取消</button>

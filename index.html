@@ -394,7 +394,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v11';
+    const KEEP = 'pos-expiry-v12';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -447,7 +447,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.6</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.7</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -1824,7 +1824,8 @@ function openForm(i){
 }
 function renderDoneBatches(){
   const box = document.getElementById('doneBatches');
-  const mine = records.filter(r=>r.pid===currentProd.id && r.name===currentProd.name)
+  // 結案批次只保留在「效期警示 → 已處理結案」歷史區，不再干擾日常登記。
+  const mine = records.filter(r=>r.pid===currentProd.id && r.name===currentProd.name && !r.done)
     .sort((a,b)=>String(a.expiry).localeCompare(String(b.expiry)));
   box.innerHTML = mine.length
     ? '<p class="muted" style="margin:0 0 4px">已登記批次(可直接修改或刪除):</p>' +
@@ -2392,7 +2393,9 @@ function renderRecords(){
   const terms = f.split(/\s+/).filter(Boolean);
   const box = document.getElementById('recList');
   const groups = {};
+  // 盤點管理只顯示仍在作業中的批次；結案紀錄另在效期頁保留並可復原。
   for(const r of records){
+    if(r.done) continue;
     const k = r.pid+'|'+r.name;
     (groups[k] = groups[k]||[]).push(r);
   }
@@ -3182,7 +3185,9 @@ function checkRecall(){
   const batches = raw.split(/[\s,、;，]+/).filter(Boolean).map(normBatch);
   const terms = name.toLowerCase().split(/\s+/).filter(Boolean);
   // 比對:品名關鍵字全中 且(若有指定批號)批號相符
-  const hits = records.filter(r=>{
+  // 已結案代表已售出、退貨或銷燬，不應再被判定為店內待下架庫存。
+  const activeRecords = records.filter(r=>!r.done);
+  const hits = activeRecords.filter(r=>{
     const nameOk = !terms.length || terms.every(t=>String(r.name||'').toLowerCase().includes(t));
     if(!nameOk) return false;
     if(!batches.length) return true;
@@ -3190,7 +3195,7 @@ function checkRecall(){
     return rb && batches.some(b => rb===b || rb.includes(b) || b.includes(rb));
   });
   // 品名有中但批號沒填的批次 → 需人工確認
-  const noBatch = batches.length ? records.filter(r=>{
+  const noBatch = batches.length ? activeRecords.filter(r=>{
     const nameOk = terms.length && terms.every(t=>String(r.name||'').toLowerCase().includes(t));
     return nameOk && !normBatch(r.batch) && !hits.includes(r);
   }) : [];
@@ -3210,7 +3215,7 @@ function checkRecall(){
   }else{
     html += `<div class="alert-item al-m6" style="margin-top:12px">
       <div class="nm">✅ 沒有符合的批次 — 店內沒有這批回收品</div>
-      <div class="dt">已比對 ${records.length} 筆盤點記錄</div>
+      <div class="dt">已比對 ${activeRecords.length} 筆未結案盤點記錄</div>
       <button class="btn-sm btn-line" style="margin-top:8px" onclick="logRecall()">📝 記錄此次已查核</button></div>`;
   }
   if(noBatch.length){
@@ -5209,7 +5214,8 @@ async function confirmDone(){
   r.doneBy = currentOp; touch(r);
   await sSet('pos-records', JSON.stringify(records));
   closeDoneModal();
-  renderAlert(); renderToday();
+  renderAlert(); renderToday(); renderRecords();
+  if(currentProd) renderDoneBatches();
   toast(r.loss ? `✓ 已結案(損失 ${r.loss.toLocaleString()} 元)` : '✓ 已結案:'+r.name.slice(0,12));
 }
 async function undoDone(rid){
@@ -5269,9 +5275,10 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
 /* ================= 統計 & 工具 ================= */
 function refreshAll(){
   const itemSet = new Set(records.map(r=>r.pid+'|'+r.name));
+  const activeRecords = records.filter(r=>!r.done);
   document.getElementById('stItems').textContent = itemSet.size;
-  document.getElementById('stBatches').textContent = records.length;
-  document.getElementById('stQty').textContent = records.reduce((s,r)=>s+r.qty,0);
+  document.getElementById('stBatches').textContent = activeRecords.length;
+  document.getElementById('stQty').textContent = activeRecords.reduce((s,r)=>s+(Number(r.qty)||0),0);
   if(DB.length){
     const pct = Math.min(100, Math.round(itemSet.size/DB.length*100));
     document.getElementById('progText').textContent = `已盤 ${itemSet.size} / ${DB.length} 品項`;

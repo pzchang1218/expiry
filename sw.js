@@ -1,5 +1,5 @@
-// v7.8:index.html 網路優先；更新盤點表單欄位順序後淘汰舊快取
-const CACHE = 'pos-expiry-v13';
+// v7.9:index.html 網路優先；移除效期快速按鈕區後淘汰舊快取
+const CACHE = 'pos-expiry-v14';
 const PRECACHE = [
   './index.html', './manifest.json', './icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

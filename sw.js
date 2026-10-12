@@ -1,5 +1,5 @@
-// v7.9:index.html 網路優先；移除效期快速按鈕區後淘汰舊快取
-const CACHE = 'pos-expiry-v14';
+// v7.10:index.html 網路優先；效期輸入可按 Enter 跳到數量欄位
+const CACHE = 'pos-expiry-v15';
 const PRECACHE = [
   './index.html', './manifest.json', './icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

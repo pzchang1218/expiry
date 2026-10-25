@@ -1,5 +1,5 @@
-// v7.11:index.html 網路優先；數量輸入可按 Enter 跳到儲存按鈕
-const CACHE = 'pos-expiry-v16';
+// v7.12:index.html 網路優先；選品後聚焦效期，儲存按鈕自動捲入視線
+const CACHE = 'pos-expiry-v17';
 const PRECACHE = [
   './index.html', './manifest.json', './icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',

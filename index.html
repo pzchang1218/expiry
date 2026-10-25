@@ -387,7 +387,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
 /* 自我修復:偵測到舊版快取就清除並重載一次(Safari 快取特別頑固) */
 (async function(){
   try{
-    const KEEP = 'pos-expiry-v16';
+    const KEEP = 'pos-expiry-v17';
     if(window.caches){
       const keys = await caches.keys();
       const stale = keys.filter(k => k !== KEEP);
@@ -440,7 +440,7 @@ body.dark .btn-ghost{background:linear-gradient(135deg,#17382f,#1b4539);border-c
   </div>
   <div class="progress-pill">
     <span id="progText">尚未載入商品主檔</span>
-    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.11</span>
+    <span id="progPct"></span><span class="tiny" style="margin-left:8px;opacity:.7">正式版 v7.12</span>
   </div>
   <div class="progress-bar"><div id="progBar"></div></div>
 </header>
@@ -1805,7 +1805,7 @@ function openForm(i){
   renderStockInBar();
   showSimilarWarn(currentProd);
   document.getElementById('formCard').classList.remove('hidden');
-  document.getElementById('formCard').scrollIntoView({behavior:'smooth', block:'start'});
+  focusAndReveal(document.getElementById('fExpDigits'));
 }
 function renderDoneBatches(){
   const box = document.getElementById('doneBatches');
@@ -1976,6 +1976,17 @@ function handleExpiryDigits(input){
   const max = expMode==='d' ? 8 : 6;
   input.value = input.value.replace(/\D/g,'').slice(0,max);
 }
+let focusRevealTimer = null;
+function focusAndReveal(element){
+  if(!element) return;
+  if(focusRevealTimer) clearTimeout(focusRevealTimer);
+  element.focus();
+  const reveal = ()=>element.scrollIntoView({behavior:'smooth', block:'center', inline:'nearest'});
+  reveal();
+  focusRevealTimer = setTimeout(()=>{
+    if(document.activeElement===element) reveal();
+  }, 300); // 等待手機鍵盤開啟或收起後，再校正一次可視位置
+}
 function handleExpiryEnter(event){
   if(event.key !== 'Enter') return;
   event.preventDefault();
@@ -1985,7 +1996,7 @@ function handleExpiryEnter(event){
   }
   const qty = document.getElementById('fQty');
   if(!qty) return;
-  qty.focus();
+  focusAndReveal(qty);
 }
 function handleQtyEnter(event){
   if(event.key !== 'Enter') return;
@@ -1997,7 +2008,7 @@ function handleQtyEnter(event){
   }
   const submit = document.getElementById('fSubmitBatch');
   if(!submit) return;
-  submit.focus();
+  focusAndReveal(submit);
 }
 function readExpiry(){
   const raw = document.getElementById('fExpDigits').value.replace(/\D/g,'');
